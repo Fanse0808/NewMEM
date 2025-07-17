@@ -177,10 +177,11 @@
         <label for="file">Excel/CSV Data File:</label>
         <div class="file-types">Supported formats: XLSX, CSV</div>
         <div class="file-input-wrapper">
-          <div class="custom-file-button">Choose File</div>
-          <input type="file" id="file" name="file" accept=".xlsx,.csv" required>
+          <div id="custom-file-button" class="custom-file-button" tabindex="0">Click To Upload File</div>
+          <input type="file" id="file" name="file" accept=".xlsx,.csv" required style="display:none;">
         </div>
-        <div id="file-name-display" class="file-name-display">No file chosen</div>
+        <div id="file-name-display" class="file-name-display"><b>Choose File</b></div>
+        <div id="file-error" style="color:red; display:none; margin-top:5px;"></div>
       </div>
       <button type="submit" class="btn btn-primary w-100 mt-3">Generate Cards</button>
     </form>
@@ -199,9 +200,66 @@
 </div>
 
 <script>
-  document.getElementById('file').addEventListener('change', function (e) {
-    const fileName = e.target.files[0] ? e.target.files[0].name : 'No file chosen';
-    document.getElementById('file-name-display').textContent = fileName;
+  const fileInput = document.getElementById('file');
+  const customButton = document.getElementById('custom-file-button');
+  const fileNameDisplay = document.getElementById('file-name-display');
+  const fileError = document.getElementById('file-error');
+  const form = fileInput.closest('form');
+
+  function triggerFileInput() {
+    fileInput.click();
+  }
+
+  function isValidFileType(fileName) {
+    return fileName.match(/\.(csv|xlsx)$/i);
+  }
+
+  customButton.addEventListener('click', triggerFileInput);
+  customButton.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ' ') triggerFileInput();
+  });
+  fileNameDisplay.addEventListener('click', triggerFileInput);
+
+  fileInput.addEventListener('change', function() {
+    if (fileInput.files.length > 0) {
+      const fileName = fileInput.files[0].name;
+      if (!isValidFileType(fileName)) {
+        fileError.textContent = 'PLEASE DOWNLOAD THE TEMPLATE';
+        fileError.style.display = 'block';
+        fileInput.value = '';
+        fileNameDisplay.textContent = 'No file chosen';
+        customButton.textContent = 'Click To Upload File';
+      } else {
+        fileError.style.display = 'none';
+        fileNameDisplay.textContent = fileName;
+        customButton.textContent = fileName;
+      }
+    } else {
+      fileNameDisplay.textContent = 'No file chosen';
+      customButton.textContent = 'Click To Upload File';
+      fileError.style.display = 'none';
+    }
+  });
+
+  form.addEventListener('submit', function(e) {
+    if (!fileInput.value || !isValidFileType(fileInput.value)) {
+      fileError.textContent = 'PLEASE DOWNLOAD THE TEMPLATE';
+      fileError.style.display = 'block';
+      e.preventDefault();
+    }
+  });
+
+  function resetFileInputUI() {
+    fileInput.value = '';
+    fileNameDisplay.innerHTML = '<b>Choose File</b>';
+    customButton.textContent = 'Click To Upload File';
+    fileError.style.display = 'none';
+  }
+
+  form.addEventListener('submit', function(e) {
+    if (fileInput.value && isValidFileType(fileInput.value)) {
+      setTimeout(resetFileInputUI, 1000); // Reset after a short delay
+    }
   });
 </script>
 </body>
