@@ -174,4 +174,6 @@ def download_template():
     return send_file(SAMPLE_CSV_PATH, as_attachment=True, download_name='sample_cards.csv')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    import os
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
