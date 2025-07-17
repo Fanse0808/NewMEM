@@ -1,22 +1,22 @@
 import os
 import shutil
 import zipfile
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, abort
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 import tempfile
 import re
 
-app = Flask(
-    __name__,
-    template_folder='Card Template/Card Template/templates',
-    static_folder='Card Template/Card Template/static'
-)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_FOLDER = os.path.join(BASE_DIR, 'Card Template', 'templates')
+STATIC_FOLDER = os.path.join(BASE_DIR, 'Card Template', 'static')
+app = Flask(__name__, template_folder=TEMPLATE_FOLDER, static_folder=STATIC_FOLDER)
 app.secret_key = 'supersecretkey'
-UPLOAD_FOLDER = 'uploads'
-OUTPUT_FOLDER = 'web_cards'
-TEMPLATE_IMAGE = 'Card.jpg'
-FONT_PATH = 'arial.ttf'
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+OUTPUT_FOLDER = os.path.join(BASE_DIR, 'web_cards')
+TEMPLATE_IMAGE = os.path.join(BASE_DIR, 'Card Template', 'Card.jpg')
+LOGO_IMAGE = os.path.join(STATIC_FOLDER, 'Logo.png')
+FONT_PATH = os.path.join(BASE_DIR, 'arial.ttf')
 LEFT_MARGIN = 60
 POLICY_NO_POS = (LEFT_MARGIN, 250)
 VALID_UNTIL_LABEL_POS = (LEFT_MARGIN, 300)
@@ -26,16 +26,20 @@ FONT_SIZE_DATE = 18
 FONT_SIZE_NAME = 21.9
 FONT_SIZE_LABEL = 18
 WHITE = (255, 255, 255)
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-os.makedirs('static', exist_ok=True)
+for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER, STATIC_FOLDER]:
+    os.makedirs(folder, exist_ok=True)
 
-# Create sample CSV file if it doesn't exist
-SAMPLE_CSV_PATH = 'static/sample_cards.csv'
+SAMPLE_CSV_PATH = os.path.join(STATIC_FOLDER, 'sample_cards.csv')
 if not os.path.exists(SAMPLE_CSV_PATH):
     sample_data = "Name,Card ID,Date\nJohn Doe,STE 12345 690 7890,2024-12-31\nJane Smith,CII 98765 432 1098,2025-01-15"
     with open(SAMPLE_CSV_PATH, 'w') as f:
         f.write(sample_data)
+if not os.path.exists(TEMPLATE_IMAGE):
+    raise FileNotFoundError(f"Card template image not found: {TEMPLATE_IMAGE}")
+if not os.path.exists(LOGO_IMAGE):
+    raise FileNotFoundError(f"Logo image not found: {LOGO_IMAGE}")
+if not os.path.exists(FONT_PATH):
+    print(f"Warning: Font file not found: {FONT_PATH}. Default font will be used.")
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xlsx', 'csv'}
@@ -64,53 +68,51 @@ def sanitize_filename(name):
     return name[:100]
 
 def generate_cards_from_df(df, output_folder):
-    with Image.open(TEMPLATE_IMAGE) as im:
-        TEMPLATE_SIZE = im.size
+    try:
+        with Image.open(TEMPLATE_IMAGE) as im:
+            TEMPLATE_SIZE = im.size
+    except Exception as e:
+        raise FileNotFoundError(f"Card template image not found or unreadable: {TEMPLATE_IMAGE}")
     font_label = load_font(FONT_PATH, int(FONT_SIZE_LABEL))
     font_policy_no = load_font(FONT_PATH, int(FONT_SIZE_POLICY_NO))
     font_date = load_font(FONT_PATH, int(FONT_SIZE_DATE))
     font_name = load_font(FONT_PATH, int(FONT_SIZE_NAME))
-    
     # Use the first three columns regardless of their names
     name_col = df.columns[0]
     card_id_col = df.columns[1]
     date_col = df.columns[2]
-    
     for i, row in enumerate(df.iterrows()):
         _, row = row
-        # Handle NaN values and ensure strings
         name = str(row[name_col]) if not pd.isna(row[name_col]) else "Unknown"
         card_id = str(row[card_id_col]) if not pd.isna(row[card_id_col]) else "Unknown"
         date = str(row[date_col]) if not pd.isna(row[date_col]) else ""
-        
-        card = Image.open(TEMPLATE_IMAGE).convert('RGB').resize(TEMPLATE_SIZE)
+        try:
+            card = Image.open(TEMPLATE_IMAGE).convert('RGB').resize(TEMPLATE_SIZE)
+        except Exception as e:
+            print(f"Error opening template image for card {i}: {e}")
+            continue
         draw = ImageDraw.Draw(card)
-        
-        # Format the card ID while preserving letters and spaces
         formatted_card_id = format_card_id(card_id)
         draw.text(POLICY_NO_POS, formatted_card_id, font=font_policy_no, fill=WHITE)
-        
         valid_until_label = "Valid Until"
         draw.text(VALID_UNTIL_LABEL_POS, valid_until_label, font=font_label, fill=WHITE)
         bbox = draw.textbbox(VALID_UNTIL_LABEL_POS, valid_until_label, font=font_label)
         label_width = bbox[2] - bbox[0]
         date_x = VALID_UNTIL_LABEL_POS[0] + label_width + 10
         draw.text((date_x, VALID_UNTIL_LABEL_POS[1]), date, font=font_date, fill=WHITE)
-        
         draw.text(NAME_POS, name, font=font_name, fill=WHITE)
-        
-        # Sanitize filename components
         safe_name = sanitize_filename(name)
         safe_card_id = sanitize_filename(card_id)
         filename = os.path.join(output_folder, f"{safe_name}_{safe_card_id}.png")
-        
         try:
             card.save(filename, format='PNG')
         except Exception as e:
             print(f"Error saving {filename}: {str(e)}")
-            # Use a fallback filename if there's an issue
             fallback_filename = os.path.join(output_folder, f"card_{i}.png")
-            card.save(fallback_filename, format='PNG')
+            try:
+                card.save(fallback_filename, format='PNG')
+            except Exception as e:
+                print(f"Error saving fallback card {i}: {e}")
 
 def zip_folder(folder_path, zip_path):
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -178,13 +180,20 @@ def index():
             flash('Allowed file types: .xlsx, .csv')
             return redirect(request.url)
     
-    return render_template('index.html')
+    try:
+        sample_data = [
+            {'Name': 'John Doe', 'Card ID': 'STE 12345 690 7890', 'Date': '2024-12-31'},
+            {'Name': 'Jane Smith', 'Card ID': 'CII 98765 432 1098', 'Date': '2025-01-15'}
+        ]
+        return render_template('index.html', sample_data=sample_data, show_table=True)
+    except Exception as e:
+        print(f"Error rendering index: {str(e)}")
+        return "An internal error occurred. Please try again later.", 500
 
 @app.route('/download_template')
 def download_template():
     return send_file(SAMPLE_CSV_PATH, as_attachment=True, download_name='sample_cards.csv')
 
 if __name__ == '__main__':
-    import os
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
