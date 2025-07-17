@@ -1,6 +1,0 @@
-Policyholder's Name,Card ID,Date
-John Doe,CII25060000249,12/31/2024
-Jane Smith,PAI25060000451,1/15/2025
-,,
-"Required Excel/CSV Format:
-The first three columns will be used as: Policyholder's Name, Card ID, Date (in that order)",,
