@@ -7,7 +7,11 @@ from PIL import Image, ImageDraw, ImageFont
 import tempfile
 import re
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder='Card Template/Card Template/templates',
+    static_folder='Card Template/Card Template/static'
+)
 app.secret_key = 'supersecretkey'
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'web_cards'
@@ -174,15 +178,7 @@ def index():
             flash('Allowed file types: .xlsx, .csv')
             return redirect(request.url)
     
-    try:
-        sample_data = [
-            {'Name': 'John Doe', 'Card ID': 'STE 12345 690 7890', 'Date': '2024-12-31'},
-            {'Name': 'Jane Smith', 'Card ID': 'CII 98765 432 1098', 'Date': '2025-01-15'}
-        ]
-        return render_template('index.html', sample_data=sample_data, show_table=True)
-    except Exception as e:
-        print(f"Error rendering index: {str(e)}")
-        return "An internal error occurred. Please try again later.", 500
+    return render_template('index.html')
 
 @app.route('/download_template')
 def download_template():

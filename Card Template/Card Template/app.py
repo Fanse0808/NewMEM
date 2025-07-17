@@ -163,11 +163,7 @@ def index():
             flash('Allowed file types: .xlsx, .csv')
             return redirect(request.url)
     
-    sample_data = [
-        {'Name': 'John Doe', 'Card ID': 'STE 12345 690 7890', 'Date': '2024-12-31'},
-        {'Name': 'Jane Smith', 'Card ID': 'CII 98765 432 1098', 'Date': '2025-01-15'}
-    ]
-    return render_template('index.html', sample_data=sample_data, show_table=True)
+    return render_template('index.html')
 
 @app.route('/download_template')
 def download_template():
