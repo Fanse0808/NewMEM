@@ -142,19 +142,30 @@ def index():
                     df = pd.read_csv(filepath)
             except Exception:
                 flash('Error reading file')
+                # Remove uploaded file if error occurs
+                if os.path.exists(filepath):
+                    os.remove(filepath)
                 return redirect(request.url)
-            
+
             # Check if there are at least 3 columns
             if len(df.columns) < 3:
                 flash('File must have at least 3 columns')
+                if os.path.exists(filepath):
+                    os.remove(filepath)
                 return redirect(request.url)
-            
+
             try:
                 generate_cards_from_df(df, OUTPUT_FOLDER)
             except Exception as e:
                 flash(f'Error generating cards: {str(e)}')
+                if os.path.exists(filepath):
+                    os.remove(filepath)
                 return redirect(request.url)
-            
+
+            # Remove uploaded file after processing
+            if os.path.exists(filepath):
+                os.remove(filepath)
+
             with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_zip:
                 zip_folder(OUTPUT_FOLDER, tmp_zip.name)
                 tmp_zip_path = tmp_zip.name
@@ -163,11 +174,15 @@ def index():
             flash('Allowed file types: .xlsx, .csv')
             return redirect(request.url)
     
-    sample_data = [
-        {'Name': 'John Doe', 'Card ID': 'STE 12345 690 7890', 'Date': '2024-12-31'},
-        {'Name': 'Jane Smith', 'Card ID': 'CII 98765 432 1098', 'Date': '2025-01-15'}
-    ]
-    return render_template('index.html', sample_data=sample_data, show_table=True)
+    try:
+        sample_data = [
+            {'Name': 'John Doe', 'Card ID': 'STE 12345 690 7890', 'Date': '2024-12-31'},
+            {'Name': 'Jane Smith', 'Card ID': 'CII 98765 432 1098', 'Date': '2025-01-15'}
+        ]
+        return render_template('index.html', sample_data=sample_data, show_table=True)
+    except Exception as e:
+        print(f"Error rendering index: {str(e)}")
+        return "An internal error occurred. Please try again later.", 500
 
 @app.route('/download_template')
 def download_template():
