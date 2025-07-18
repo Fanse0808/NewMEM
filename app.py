@@ -19,12 +19,12 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'supersecretkey')
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'web_cards'
-TEMPLATE_IMAGE = 'Card.jpg'
+TEMPLATE_IMAGE = 'Card_Regular.jpg'
 FONT_PATH = 'arial.ttf'
 LEFT_MARGIN = 60
-POLICY_NO_POS = (LEFT_MARGIN, 250)
-VALID_UNTIL_LABEL_POS = (LEFT_MARGIN, 300)
-NAME_POS = (LEFT_MARGIN, 420)
+POLICY_NO_POS = (LEFT_MARGIN, 230)
+VALID_UNTIL_LABEL_POS = (LEFT_MARGIN, 280)
+NAME_POS = (LEFT_MARGIN, 400)
 FONT_SIZE_POLICY_NO = 36.4
 FONT_SIZE_DATE = 22
 FONT_SIZE_NAME = 25
@@ -41,7 +41,7 @@ for folder in (UPLOAD_FOLDER, OUTPUT_FOLDER, 'static'):
 # Create sample CSV file if it doesn't exist (now with VIP and Email columns)
 SAMPLE_CSV_PATH = 'static/sample_cards.csv'
 if not os.path.exists(SAMPLE_CSV_PATH):
-    sample_data = "Name,Card ID,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\nJane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com"
+    sample_data = "Name,Card,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\nJane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com"
     with open(SAMPLE_CSV_PATH, 'w') as f:
         f.write(sample_data)
 
@@ -99,9 +99,9 @@ def api_create_card():
     Card = data.get('Card')
     date = data.get('Date')
     if not all([name, Card, date]):
-        return {"error": "Missing required fields: Name, Card ID, Date"}, 400
+        return {"error": "Missing required fields: Name, Card, Date"}, 400
     # Create a DataFrame with one row
-    df = pd.DataFrame([[name, Card, date]], columns=['Name', 'Card ID', 'Date'])
+    df = pd.DataFrame([[name, Card, date]], columns=['Name', 'Card', 'Date'])
     output_folder = tempfile.mkdtemp()
     generate_cards_from_df(df, output_folder)
     card_file = os.path.join(output_folder, f"{sanitize_filename(name)}_{sanitize_filename(Card)}.png")
