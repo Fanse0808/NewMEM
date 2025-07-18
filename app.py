@@ -1,16 +1,16 @@
 
+
 import os
 import shutil
 import zipfile
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file
-import pandas as pd
-from PIL import Image, ImageDraw, ImageFont
 import tempfile
 import re
 import threading
 import time
 import logging
-
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file
+import pandas as pd
+from PIL import Image, ImageDraw, ImageFont
 
 # Logging for Render troubleshooting
 logging.basicConfig(level=logging.INFO)
@@ -37,12 +37,14 @@ for folder in (UPLOAD_FOLDER, OUTPUT_FOLDER, 'static'):
         logging.error(f"Failed to create folder {folder}: {e}")
 
 
+
 # Create sample CSV file if it doesn't exist (now with VIP and Email columns)
 SAMPLE_CSV_PATH = 'static/sample_cards.csv'
 if not os.path.exists(SAMPLE_CSV_PATH):
     sample_data = "Name,Card ID,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\nJane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com"
     with open(SAMPLE_CSV_PATH, 'w') as f:
         f.write(sample_data)
+
 
 # Helper function to send email with attachment (using smtplib)
 import smtplib
@@ -86,7 +88,6 @@ def send_email_with_attachment(to_email, subject, body, attachment_path):
     except Exception as e:
         logging.error(f"Failed to send email to {to_email}: {e}")
 
-# ...existing code...
 
 # Place the /api/create_card endpoint after app is defined
 @app.route('/api/create_card', methods=['POST'])
@@ -110,51 +111,13 @@ def api_create_card():
         if not card_file:
             return {"error": "Card image not generated"}, 500
     return send_file(card_file, as_attachment=True, download_name='card.png')
-import os
-import shutil
-import zipfile
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file
-import pandas as pd
-from PIL import Image, ImageDraw, ImageFont
-import tempfile
-import re
-import threading
-import time
 
-app = Flask(__name__)
-app.secret_key = 'supersecretkey'
-UPLOAD_FOLDER = 'uploads'
-OUTPUT_FOLDER = 'web_cards'
-TEMPLATE_IMAGE = 'Card.jpg'
-FONT_PATH = 'arial.ttf'
-LEFT_MARGIN = 60
-POLICY_NO_POS = (LEFT_MARGIN, 250)
-VALID_UNTIL_LABEL_POS = (LEFT_MARGIN, 300)
-NAME_POS = (LEFT_MARGIN, 420)
-FONT_SIZE_POLICY_NO = 36.4
-FONT_SIZE_DATE = 22
-FONT_SIZE_NAME = 25
-FONT_SIZE_LABEL = 18
-WHITE = (255, 255, 255)
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-os.makedirs('static', exist_ok=True)
-
-# Create sample CSV file if it doesn't exist
-SAMPLE_CSV_PATH = 'static/sample_cards.csv'
-if not os.path.exists(SAMPLE_CSV_PATH):
-    sample_data = "Name,Card ID,Date\nJohn Doe,STE 12345 690 7890,2024-12-31\nJane Smith,CII 98765 432 1098,2025-01-15"
-    with open(SAMPLE_CSV_PATH, 'w') as f:
-        f.write(sample_data)
-
+# --- Utility Functions ---
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xlsx', 'csv'}
 
 def format_card_id(card_id):
-    """Format card ID while preserving letters and existing spaces"""
-    # Remove any non-alphanumeric characters except spaces
     cleaned = re.sub(r'[^a-zA-Z0-9\s]', '', str(card_id))
-    # Preserve existing spacing but remove multiple spaces
     cleaned = ' '.join(cleaned.split())
     return cleaned
 
@@ -165,36 +128,29 @@ def load_font(path, size):
         return ImageFont.load_default()
 
 def sanitize_filename(name):
-    """Sanitize filenames to remove invalid characters"""
-    # Replace spaces with underscores
     name = name.replace(' ', '_')
-    # Remove invalid characters
     name = re.sub(r'[\\/*?:"<>|\n]', '', name)
-    # Truncate long names
     return name[:100]
 
 def generate_cards_from_df(df, output_folder):
-    # Prepare fonts
     font_label = load_font(FONT_PATH, int(FONT_SIZE_LABEL))
     font_policy_no = load_font(FONT_PATH, int(FONT_SIZE_POLICY_NO))
     font_date = load_font(FONT_PATH, int(FONT_SIZE_DATE))
     font_name = load_font(FONT_PATH, int(FONT_SIZE_NAME))
 
-    # Use the first five columns: Name, Card ID, Date, VIP, Email
     name_col = df.columns[0]
     card_id_col = df.columns[1]
     date_col = df.columns[2]
     vip_col = df.columns[3] if len(df.columns) > 3 else None
     email_col = df.columns[4] if len(df.columns) > 4 else None
 
-    for i, row in enumerate(df.itertuples(index=False)):  # Use itertuples for lower memory
+    for i, row in enumerate(df.itertuples(index=False)):
         name = str(getattr(row, name_col)) if hasattr(row, name_col) and not pd.isna(getattr(row, name_col)) else "Unknown"
         card_id = str(getattr(row, card_id_col)) if hasattr(row, card_id_col) and not pd.isna(getattr(row, card_id_col)) else "Unknown"
         date = str(getattr(row, date_col)) if hasattr(row, date_col) and not pd.isna(getattr(row, date_col)) else ""
         vip_status = str(getattr(row, vip_col)).strip().lower() if vip_col and hasattr(row, vip_col) and not pd.isna(getattr(row, vip_col)) else "no"
         email = str(getattr(row, email_col)).strip() if email_col and hasattr(row, email_col) and not pd.isna(getattr(row, email_col)) else None
 
-        # Select template based on VIP status
         template_img = os.path.join('static', 'Card_VIP.jpg') if vip_status == 'yes' else os.path.join('static', 'Card_Regular.jpg')
         if not os.path.exists(template_img):
             template_img = TEMPLATE_IMAGE
@@ -223,7 +179,7 @@ def generate_cards_from_df(df, output_folder):
             try:
                 card.save(filename, format='PNG')
             except Exception as e:
-                print(f"Error saving {filename}: {str(e)}")
+                logging.error(f"Error saving {filename}: {str(e)}")
                 fallback_filename = os.path.join(output_folder, f"card_{i}.png")
                 card.save(fallback_filename, format='PNG')
 
@@ -251,12 +207,13 @@ def clear_folders_periodically():
                     elif os.path.isdir(file_path):
                         shutil.rmtree(file_path)
                 except Exception as e:
-                    print(f'Failed to delete {file_path}. Reason: {e}')
+                    logging.error(f'Failed to delete {file_path}. Reason: {e}')
         time.sleep(60 * 60 * 12)  # 12 hours
 
-# Start the background thread for periodic cleanup
-cleanup_thread = threading.Thread(target=clear_folders_periodically, daemon=True)
-cleanup_thread.start()
+# Start the background thread for periodic cleanup (only if not running in test mode)
+if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+    cleanup_thread = threading.Thread(target=clear_folders_periodically, daemon=True)
+    cleanup_thread.start()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -285,18 +242,14 @@ def index():
             except Exception:
                 flash('Error reading file')
                 return redirect(request.url)
-            
-            # Check if there are at least 3 columns
             if len(df.columns) < 3:
                 flash('File must have at least 3 columns')
                 return redirect(request.url)
-            
             try:
                 generate_cards_from_df(df, OUTPUT_FOLDER)
             except Exception as e:
                 flash(f'Error generating cards: {str(e)}')
                 return redirect(request.url)
-            
             with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_zip:
                 zip_folder(OUTPUT_FOLDER, tmp_zip.name)
                 tmp_zip_path = tmp_zip.name
@@ -304,8 +257,6 @@ def index():
         else:
             flash('PLEASE DOWNLOAD THE TEMPLATE')
             return redirect(request.url)
-    
-    # Remove sample_data and show_table if not used in template
     return render_template('index.html')
 
 @app.route('/download_template')
@@ -313,7 +264,6 @@ def download_template():
     return send_file(SAMPLE_CSV_PATH, as_attachment=True, download_name='sample_cards.csv')
 
 if __name__ == '__main__':
-    # Use the port provided by Render, or default to 5003
     port = int(os.environ.get('PORT', 5003))
     logging.info(f"Starting Flask app on port {port}")
     app.run(host='0.0.0.0', port=port, threaded=True)
