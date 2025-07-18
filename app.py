@@ -96,15 +96,15 @@ def api_create_card():
     if not data:
         return {"error": "No JSON payload provided"}, 400
     name = data.get('Name')
-    card_id = data.get('Card ID')
+    Card = data.get('Card')
     date = data.get('Date')
-    if not all([name, card_id, date]):
+    if not all([name, Card, date]):
         return {"error": "Missing required fields: Name, Card ID, Date"}, 400
     # Create a DataFrame with one row
-    df = pd.DataFrame([[name, card_id, date]], columns=['Name', 'Card ID', 'Date'])
+    df = pd.DataFrame([[name, Card, date]], columns=['Name', 'Card ID', 'Date'])
     output_folder = tempfile.mkdtemp()
     generate_cards_from_df(df, output_folder)
-    card_file = os.path.join(output_folder, f"{sanitize_filename(name)}_{sanitize_filename(card_id)}.png")
+    card_file = os.path.join(output_folder, f"{sanitize_filename(name)}_{sanitize_filename(Card)}.png")
     if not os.path.exists(card_file):
         # fallback if file not found
         card_file = next((os.path.join(output_folder, f) for f in os.listdir(output_folder) if f.endswith('.png')), None)
@@ -116,8 +116,8 @@ def api_create_card():
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xlsx', 'csv'}
 
-def format_card_id(card_id):
-    cleaned = re.sub(r'[^a-zA-Z0-9\s]', '', str(card_id))
+def format_Card(Card):
+    cleaned = re.sub(r'[^a-zA-Z0-9\s]', '', str(Card))
     cleaned = ' '.join(cleaned.split())
     return cleaned
 
@@ -139,14 +139,14 @@ def generate_cards_from_df(df, output_folder):
     font_name = load_font(FONT_PATH, int(FONT_SIZE_NAME))
 
     name_col = df.columns[0]
-    card_id_col = df.columns[1]
+    Card_col = df.columns[1]
     date_col = df.columns[2]
     vip_col = df.columns[3] if len(df.columns) > 3 else None
     email_col = df.columns[4] if len(df.columns) > 4 else None
 
     for i, row in enumerate(df.itertuples(index=False)):
         name = str(getattr(row, name_col)) if hasattr(row, name_col) and not pd.isna(getattr(row, name_col)) else "Unknown"
-        card_id = str(getattr(row, card_id_col)) if hasattr(row, card_id_col) and not pd.isna(getattr(row, card_id_col)) else "Unknown"
+        Card = str(getattr(row, Card_col)) if hasattr(row, Card_col) and not pd.isna(getattr(row, Card_col)) else "Unknown"
         date = str(getattr(row, date_col)) if hasattr(row, date_col) and not pd.isna(getattr(row, date_col)) else ""
         vip_status = str(getattr(row, vip_col)).strip().lower() if vip_col and hasattr(row, vip_col) and not pd.isna(getattr(row, vip_col)) else "no"
         email = str(getattr(row, email_col)).strip() if email_col and hasattr(row, email_col) and not pd.isna(getattr(row, email_col)) else None
@@ -160,8 +160,8 @@ def generate_cards_from_df(df, output_folder):
             card = im.convert('RGB').resize(TEMPLATE_SIZE)
             draw = ImageDraw.Draw(card)
 
-            formatted_card_id = format_card_id(card_id)
-            draw.text(POLICY_NO_POS, formatted_card_id, font=font_policy_no, fill=WHITE)
+            formatted_Card = format_Card(Card)
+            draw.text(POLICY_NO_POS, formatted_Card, font=font_policy_no, fill=WHITE)
 
             valid_until_label = "Valid Until"
             draw.text(VALID_UNTIL_LABEL_POS, valid_until_label, font=font_label, fill=WHITE)
@@ -173,8 +173,8 @@ def generate_cards_from_df(df, output_folder):
             draw.text(NAME_POS, name, font=font_name, fill=WHITE)
 
             safe_name = sanitize_filename(name)
-            safe_card_id = sanitize_filename(card_id)
-            filename = os.path.join(output_folder, f"{safe_name}_{safe_card_id}.png")
+            safe_Card = sanitize_filename(Card)
+            filename = os.path.join(output_folder, f"{safe_name}_{safe_Card}.png")
 
             try:
                 card.save(filename, format='PNG')
