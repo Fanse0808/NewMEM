@@ -1,3 +1,24 @@
+@app.route('/api/create_card', methods=['POST'])
+def api_create_card():
+    data = request.get_json()
+    if not data:
+        return {"error": "No JSON payload provided"}, 400
+    name = data.get('Name')
+    card_id = data.get('Card ID')
+    date = data.get('Date')
+    if not all([name, card_id, date]):
+        return {"error": "Missing required fields: Name, Card ID, Date"}, 400
+    # Create a DataFrame with one row
+    df = pd.DataFrame([[name, card_id, date]], columns=['Name', 'Card ID', 'Date'])
+    output_folder = tempfile.mkdtemp()
+    generate_cards_from_df(df, output_folder)
+    card_file = os.path.join(output_folder, f"{sanitize_filename(name)}_{sanitize_filename(card_id)}.png")
+    if not os.path.exists(card_file):
+        # fallback if file not found
+        card_file = next((os.path.join(output_folder, f) for f in os.listdir(output_folder) if f.endswith('.png')), None)
+        if not card_file:
+            return {"error": "Card image not generated"}, 500
+    return send_file(card_file, as_attachment=True, download_name='card.png')
 import os
 import shutil
 import zipfile
