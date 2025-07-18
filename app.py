@@ -28,12 +28,53 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 os.makedirs('static', exist_ok=True)
 
-# Create sample CSV file if it doesn't exist
+
+# Create sample CSV file if it doesn't exist (now with VIP and Email columns)
 SAMPLE_CSV_PATH = 'static/sample_cards.csv'
 if not os.path.exists(SAMPLE_CSV_PATH):
-    sample_data = "Name,Card ID,Date\nJohn Doe,STE 12345 690 7890,2024-12-31\nJane Smith,CII 98765 432 1098,2025-01-15"
+    sample_data = "Name,Card ID,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\nJane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com"
     with open(SAMPLE_CSV_PATH, 'w') as f:
         f.write(sample_data)
+
+# Helper function to send email with attachment (using smtplib)
+import smtplib
+from email.message import EmailMessage
+import mimetypes
+
+def send_email_with_attachment(to_email, subject, body, attachment_path):
+    smtp_server = os.environ.get('SMTP_SERVER')
+    smtp_port = int(os.environ.get('SMTP_PORT', 587))
+    smtp_user = os.environ.get('SMTP_USER')
+    smtp_password = os.environ.get('SMTP_PASSWORD')
+    from_email = smtp_user
+    if not all([smtp_server, smtp_port, smtp_user, smtp_password]):
+        print("SMTP configuration is missing. Set SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD as environment variables.")
+        return
+
+    msg = EmailMessage()
+    msg['Subject'] = subject
+    msg['From'] = from_email
+    msg['To'] = to_email
+    msg.set_content(body)
+
+    # Attach the file
+    if attachment_path and os.path.exists(attachment_path):
+        with open(attachment_path, 'rb') as f:
+            file_data = f.read()
+            maintype, subtype = mimetypes.guess_type(attachment_path)[0].split('/') if mimetypes.guess_type(attachment_path)[0] else ('application', 'octet-stream')
+            filename = os.path.basename(attachment_path)
+            msg.add_attachment(file_data, maintype=maintype, subtype=subtype, filename=filename)
+
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            # Only use TLS and login if password is provided
+            if smtp_password:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+        print(f"Email sent to {to_email} with attachment {attachment_path}")
+    except Exception as e:
+        print(f"Failed to send email to {to_email}: {e}")
 
 # ...existing code...
 
@@ -123,53 +164,72 @@ def sanitize_filename(name):
     return name[:100]
 
 def generate_cards_from_df(df, output_folder):
-    with Image.open(TEMPLATE_IMAGE) as im:
-        TEMPLATE_SIZE = im.size
+    # Prepare fonts
     font_label = load_font(FONT_PATH, int(FONT_SIZE_LABEL))
     font_policy_no = load_font(FONT_PATH, int(FONT_SIZE_POLICY_NO))
     font_date = load_font(FONT_PATH, int(FONT_SIZE_DATE))
     font_name = load_font(FONT_PATH, int(FONT_SIZE_NAME))
-    
-    # Use the first three columns regardless of their names
+
+    # Use the first five columns: Name, Card ID, Date, VIP, Email
     name_col = df.columns[0]
     card_id_col = df.columns[1]
     date_col = df.columns[2]
-    
+    vip_col = df.columns[3] if len(df.columns) > 3 else None
+    email_col = df.columns[4] if len(df.columns) > 4 else None
+
     for i, row in enumerate(df.iterrows()):
         _, row = row
-        # Handle NaN values and ensure strings
         name = str(row[name_col]) if not pd.isna(row[name_col]) else "Unknown"
         card_id = str(row[card_id_col]) if not pd.isna(row[card_id_col]) else "Unknown"
         date = str(row[date_col]) if not pd.isna(row[date_col]) else ""
-        
-        card = Image.open(TEMPLATE_IMAGE).convert('RGB').resize(TEMPLATE_SIZE)
-        draw = ImageDraw.Draw(card)
-        
-        # Format the card ID while preserving letters and spaces
-        formatted_card_id = format_card_id(card_id)
-        draw.text(POLICY_NO_POS, formatted_card_id, font=font_policy_no, fill=WHITE)
-        
-        valid_until_label = "Valid Until"
-        draw.text(VALID_UNTIL_LABEL_POS, valid_until_label, font=font_label, fill=WHITE)
-        bbox = draw.textbbox(VALID_UNTIL_LABEL_POS, valid_until_label, font=font_label)
-        label_width = bbox[2] - bbox[0]
-        date_x = VALID_UNTIL_LABEL_POS[0] + label_width + 10
-        draw.text((date_x, VALID_UNTIL_LABEL_POS[1]), date, font=font_date, fill=WHITE)
-        
-        draw.text(NAME_POS, name, font=font_name, fill=WHITE)
-        
-        # Sanitize filename components
-        safe_name = sanitize_filename(name)
-        safe_card_id = sanitize_filename(card_id)
-        filename = os.path.join(output_folder, f"{safe_name}_{safe_card_id}.png")
-        
-        try:
-            card.save(filename, format='PNG')
-        except Exception as e:
-            print(f"Error saving {filename}: {str(e)}")
-            # Use a fallback filename if there's an issue
-            fallback_filename = os.path.join(output_folder, f"card_{i}.png")
-            card.save(fallback_filename, format='PNG')
+        vip_status = str(row[vip_col]).strip().lower() if vip_col and not pd.isna(row[vip_col]) else "no"
+        email = str(row[email_col]).strip() if email_col and not pd.isna(row[email_col]) else None
+
+        # Select template based on VIP status
+        if vip_status == 'yes':
+            template_img = os.path.join('static', 'Card_VIP.jpg')
+        else:
+            template_img = os.path.join('static', 'Card_Regular.jpg')
+        # Fallback to default if not found
+        if not os.path.exists(template_img):
+            template_img = TEMPLATE_IMAGE
+
+        with Image.open(template_img) as im:
+            TEMPLATE_SIZE = im.size
+            card = im.convert('RGB').resize(TEMPLATE_SIZE)
+            draw = ImageDraw.Draw(card)
+
+            # Format the card ID while preserving letters and spaces
+            formatted_card_id = format_card_id(card_id)
+            draw.text(POLICY_NO_POS, formatted_card_id, font=font_policy_no, fill=WHITE)
+
+            valid_until_label = "Valid Until"
+            draw.text(VALID_UNTIL_LABEL_POS, valid_until_label, font=font_label, fill=WHITE)
+            bbox = draw.textbbox(VALID_UNTIL_LABEL_POS, valid_until_label, font=font_label)
+            label_width = bbox[2] - bbox[0]
+            date_x = VALID_UNTIL_LABEL_POS[0] + label_width + 10
+            draw.text((date_x, VALID_UNTIL_LABEL_POS[1]), date, font=font_date, fill=WHITE)
+
+            draw.text(NAME_POS, name, font=font_name, fill=WHITE)
+
+            # Sanitize filename components
+            safe_name = sanitize_filename(name)
+            safe_card_id = sanitize_filename(card_id)
+            filename = os.path.join(output_folder, f"{safe_name}_{safe_card_id}.png")
+
+            try:
+                card.save(filename, format='PNG')
+            except Exception as e:
+                print(f"Error saving {filename}: {str(e)}")
+                # Use a fallback filename if there's an issue
+                fallback_filename = os.path.join(output_folder, f"card_{i}.png")
+                card.save(fallback_filename, format='PNG')
+
+            # Send email with attachment if email is provided
+            if email:
+                subject = f"Your Policy Card ({'VIP' if vip_status == 'yes' else 'Regular'})"
+                body = f"Dear {name},\n\nPlease find your policy card attached.\n\nBest regards,\nYour Company"
+                send_email_with_attachment(email, subject, body, filename)
 
 def zip_folder(folder_path, zip_path):
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
