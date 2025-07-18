@@ -1,3 +1,4 @@
+
 import os
 import shutil
 import zipfile
@@ -8,9 +9,14 @@ import tempfile
 import re
 import threading
 import time
+import logging
+
+
+# Logging for Render troubleshooting
+logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
-app.secret_key = 'supersecretkey'
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'supersecretkey')
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'web_cards'
 TEMPLATE_IMAGE = 'Card.jpg'
@@ -24,9 +30,11 @@ FONT_SIZE_DATE = 22
 FONT_SIZE_NAME = 25
 FONT_SIZE_LABEL = 18
 WHITE = (255, 255, 255)
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-os.makedirs('static', exist_ok=True)
+for folder in (UPLOAD_FOLDER, OUTPUT_FOLDER, 'static'):
+    try:
+        os.makedirs(folder, exist_ok=True)
+    except Exception as e:
+        logging.error(f"Failed to create folder {folder}: {e}")
 
 
 # Create sample CSV file if it doesn't exist (now with VIP and Email columns)
@@ -47,8 +55,9 @@ def send_email_with_attachment(to_email, subject, body, attachment_path):
     smtp_user = os.environ.get('SMTP_USER')
     smtp_password = os.environ.get('SMTP_PASSWORD')
     from_email = smtp_user
-    if not all([smtp_server, smtp_port, smtp_user, smtp_password]):
-        print("SMTP configuration is missing. Set SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD as environment variables.")
+
+    if not all([smtp_server, smtp_port, smtp_user]):
+        logging.error("SMTP configuration is missing. Set SMTP_SERVER, SMTP_PORT, SMTP_USER as environment variables.")
         return
 
     msg = EmailMessage()
@@ -57,24 +66,25 @@ def send_email_with_attachment(to_email, subject, body, attachment_path):
     msg['To'] = to_email
     msg.set_content(body)
 
-    # Attach the file
+    # Attach the file efficiently (stream, avoid loading whole file in memory)
     if attachment_path and os.path.exists(attachment_path):
-        with open(attachment_path, 'rb') as f:
-            file_data = f.read()
+        try:
             maintype, subtype = mimetypes.guess_type(attachment_path)[0].split('/') if mimetypes.guess_type(attachment_path)[0] else ('application', 'octet-stream')
             filename = os.path.basename(attachment_path)
-            msg.add_attachment(file_data, maintype=maintype, subtype=subtype, filename=filename)
+            with open(attachment_path, 'rb') as f:
+                msg.add_attachment(f.read(), maintype=maintype, subtype=subtype, filename=filename)
+        except Exception as e:
+            logging.error(f"Failed to attach file {attachment_path}: {e}")
 
     try:
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            # Only use TLS and login if password is provided
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             if smtp_password:
                 server.starttls()
                 server.login(smtp_user, smtp_password)
             server.send_message(msg)
-        print(f"Email sent to {to_email} with attachment {attachment_path}")
+        logging.info(f"Email sent to {to_email} with attachment {attachment_path}")
     except Exception as e:
-        print(f"Failed to send email to {to_email}: {e}")
+        logging.error(f"Failed to send email to {to_email}: {e}")
 
 # ...existing code...
 
@@ -177,20 +187,15 @@ def generate_cards_from_df(df, output_folder):
     vip_col = df.columns[3] if len(df.columns) > 3 else None
     email_col = df.columns[4] if len(df.columns) > 4 else None
 
-    for i, row in enumerate(df.iterrows()):
-        _, row = row
-        name = str(row[name_col]) if not pd.isna(row[name_col]) else "Unknown"
-        card_id = str(row[card_id_col]) if not pd.isna(row[card_id_col]) else "Unknown"
-        date = str(row[date_col]) if not pd.isna(row[date_col]) else ""
-        vip_status = str(row[vip_col]).strip().lower() if vip_col and not pd.isna(row[vip_col]) else "no"
-        email = str(row[email_col]).strip() if email_col and not pd.isna(row[email_col]) else None
+    for i, row in enumerate(df.itertuples(index=False)):  # Use itertuples for lower memory
+        name = str(getattr(row, name_col)) if hasattr(row, name_col) and not pd.isna(getattr(row, name_col)) else "Unknown"
+        card_id = str(getattr(row, card_id_col)) if hasattr(row, card_id_col) and not pd.isna(getattr(row, card_id_col)) else "Unknown"
+        date = str(getattr(row, date_col)) if hasattr(row, date_col) and not pd.isna(getattr(row, date_col)) else ""
+        vip_status = str(getattr(row, vip_col)).strip().lower() if vip_col and hasattr(row, vip_col) and not pd.isna(getattr(row, vip_col)) else "no"
+        email = str(getattr(row, email_col)).strip() if email_col and hasattr(row, email_col) and not pd.isna(getattr(row, email_col)) else None
 
         # Select template based on VIP status
-        if vip_status == 'yes':
-            template_img = os.path.join('static', 'Card_VIP.jpg')
-        else:
-            template_img = os.path.join('static', 'Card_Regular.jpg')
-        # Fallback to default if not found
+        template_img = os.path.join('static', 'Card_VIP.jpg') if vip_status == 'yes' else os.path.join('static', 'Card_Regular.jpg')
         if not os.path.exists(template_img):
             template_img = TEMPLATE_IMAGE
 
@@ -199,7 +204,6 @@ def generate_cards_from_df(df, output_folder):
             card = im.convert('RGB').resize(TEMPLATE_SIZE)
             draw = ImageDraw.Draw(card)
 
-            # Format the card ID while preserving letters and spaces
             formatted_card_id = format_card_id(card_id)
             draw.text(POLICY_NO_POS, formatted_card_id, font=font_policy_no, fill=WHITE)
 
@@ -212,7 +216,6 @@ def generate_cards_from_df(df, output_folder):
 
             draw.text(NAME_POS, name, font=font_name, fill=WHITE)
 
-            # Sanitize filename components
             safe_name = sanitize_filename(name)
             safe_card_id = sanitize_filename(card_id)
             filename = os.path.join(output_folder, f"{safe_name}_{safe_card_id}.png")
@@ -221,11 +224,9 @@ def generate_cards_from_df(df, output_folder):
                 card.save(filename, format='PNG')
             except Exception as e:
                 print(f"Error saving {filename}: {str(e)}")
-                # Use a fallback filename if there's an issue
                 fallback_filename = os.path.join(output_folder, f"card_{i}.png")
                 card.save(fallback_filename, format='PNG')
 
-            # Send email with attachment if email is provided
             if email:
                 subject = f"Your Policy Card ({'VIP' if vip_status == 'yes' else 'Regular'})"
                 body = f"Dear {name},\n\nPlease find your policy card attached.\n\nBest regards,\nYour Company"
@@ -312,4 +313,7 @@ def download_template():
     return send_file(SAMPLE_CSV_PATH, as_attachment=True, download_name='sample_cards.csv')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5003)
+    # Use the port provided by Render, or default to 5003
+    port = int(os.environ.get('PORT', 5003))
+    logging.info(f"Starting Flask app on port {port}")
+    app.run(host='0.0.0.0', port=port, threaded=True)
