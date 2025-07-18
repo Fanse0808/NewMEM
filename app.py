@@ -184,8 +184,8 @@ def generate_cards_from_df(df, output_folder):
                 card.save(fallback_filename, format='PNG')
 
             if email:
-                subject = f"Your Policy Card ({'VIP' if vip_status == 'yes' else 'Regular'})"
-                body = f"Dear {name},\n\nPlease find your policy card attached.\n\nBest regards,\nYour Company"
+                subject = f"Your A-Member Card Awaits You ({'VIP' if vip_status == 'yes' else 'Regular'})"
+                body = f"Dear {name},\n\nPlease find your A-Member card attached.\n\nCustomer Care & Complaints Management\nOperation Department\n\nPhone: +95 9791232222\n\nEmail: customercare@alife.com.mm\n\nA Life Insurance Company Limited"
                 send_email_with_attachment(email, subject, body, filename)
 
 def zip_folder(folder_path, zip_path):
