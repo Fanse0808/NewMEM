@@ -1,3 +1,43 @@
+import os
+import shutil
+import zipfile
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file
+import pandas as pd
+from PIL import Image, ImageDraw, ImageFont
+import tempfile
+import re
+import threading
+import time
+
+app = Flask(__name__)
+app.secret_key = 'supersecretkey'
+UPLOAD_FOLDER = 'uploads'
+OUTPUT_FOLDER = 'web_cards'
+TEMPLATE_IMAGE = 'Card.jpg'
+FONT_PATH = 'arial.ttf'
+LEFT_MARGIN = 60
+POLICY_NO_POS = (LEFT_MARGIN, 250)
+VALID_UNTIL_LABEL_POS = (LEFT_MARGIN, 300)
+NAME_POS = (LEFT_MARGIN, 420)
+FONT_SIZE_POLICY_NO = 36.4
+FONT_SIZE_DATE = 22
+FONT_SIZE_NAME = 25
+FONT_SIZE_LABEL = 18
+WHITE = (255, 255, 255)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+os.makedirs('static', exist_ok=True)
+
+# Create sample CSV file if it doesn't exist
+SAMPLE_CSV_PATH = 'static/sample_cards.csv'
+if not os.path.exists(SAMPLE_CSV_PATH):
+    sample_data = "Name,Card ID,Date\nJohn Doe,STE 12345 690 7890,2024-12-31\nJane Smith,CII 98765 432 1098,2025-01-15"
+    with open(SAMPLE_CSV_PATH, 'w') as f:
+        f.write(sample_data)
+
+# ...existing code...
+
+# Place the /api/create_card endpoint after app is defined
 @app.route('/api/create_card', methods=['POST'])
 def api_create_card():
     data = request.get_json()
