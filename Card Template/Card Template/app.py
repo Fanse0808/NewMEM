@@ -29,17 +29,17 @@ os.makedirs('static', exist_ok=True)
 # Create sample CSV file if it doesn't exist
 SAMPLE_CSV_PATH = 'static/sample_cards.csv'
 if not os.path.exists(SAMPLE_CSV_PATH):
-    sample_data = "Name,Card ID,Date\nJohn Doe,STE 12345 690 7890,2024-12-31\nJane Smith,CII 98765 432 1098,2025-01-15"
+    sample_data = "Name,Card,Date\nJohn Doe,STE 12345 690 7890,2024-12-31\nJane Smith,CII 98765 432 1098,2025-01-15"
     with open(SAMPLE_CSV_PATH, 'w') as f:
         f.write(sample_data)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xlsx', 'csv'}
 
-def format_card_id(card_id):
-    """Format card ID while preserving letters and existing spaces"""
+def format_Card(Card):
+    """Format Card while preserving letters and existing spaces"""
     # Remove any non-alphanumeric characters except spaces
-    cleaned = re.sub(r'[^a-zA-Z0-9\s]', '', str(card_id))
+    cleaned = re.sub(r'[^a-zA-Z0-9\s]', '', str(Card))
     # Preserve existing spacing but remove multiple spaces
     cleaned = ' '.join(cleaned.split())
     return cleaned
@@ -69,22 +69,22 @@ def generate_cards_from_df(df, output_folder):
     
     # Use the first three columns regardless of their names
     name_col = df.columns[0]
-    card_id_col = df.columns[1]
+    Card_col = df.columns[1]
     date_col = df.columns[2]
     
     for i, row in enumerate(df.iterrows()):
         _, row = row
         # Handle NaN values and ensure strings
         name = str(row[name_col]) if not pd.isna(row[name_col]) else "Unknown"
-        card_id = str(row[card_id_col]) if not pd.isna(row[card_id_col]) else "Unknown"
+        Card = str(row[Card_col]) if not pd.isna(row[Card_col]) else "Unknown"
         date = str(row[date_col]) if not pd.isna(row[date_col]) else ""
         
         card = Image.open(TEMPLATE_IMAGE).convert('RGB').resize(TEMPLATE_SIZE)
         draw = ImageDraw.Draw(card)
         
-        # Format the card ID while preserving letters and spaces
-        formatted_card_id = format_card_id(card_id)
-        draw.text(POLICY_NO_POS, formatted_card_id, font=font_policy_no, fill=WHITE)
+        # Format the Card while preserving letters and spaces
+        formatted_Card = format_Card(Card)
+        draw.text(POLICY_NO_POS, formatted_Card, font=font_policy_no, fill=WHITE)
         
         valid_until_label = "Valid Until"
         draw.text(VALID_UNTIL_LABEL_POS, valid_until_label, font=font_label, fill=WHITE)
@@ -97,8 +97,8 @@ def generate_cards_from_df(df, output_folder):
         
         # Sanitize filename components
         safe_name = sanitize_filename(name)
-        safe_card_id = sanitize_filename(card_id)
-        filename = os.path.join(output_folder, f"{safe_name}_{safe_card_id}.png")
+        safe_Card = sanitize_filename(Card)
+        filename = os.path.join(output_folder, f"{safe_name}_{safe_Card}.png")
         
         try:
             card.save(filename, format='PNG')
