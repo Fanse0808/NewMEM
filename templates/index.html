@@ -142,7 +142,7 @@
     }
 
     .card-preview img {
-      max-width: 100%;
+      width: 100%;
       height: auto;
       border-radius: 8px;
       display: block;
@@ -156,7 +156,8 @@
         padding: 10px;
       }
       .card-preview img {
-        max-width: 90vw;
+        width: 100vw;
+        max-width: 100vw;
         margin-top: 10px;
       }
     }
@@ -213,7 +214,7 @@
 
     <div class="card-preview mt-4">
       <h3>Sample Card Preview</h3>
-      <img src="{{ url_for('static', filename='Preview.png') }}" alt="Card Preview" class="img-fluid">
+      <img src="{{ url_for('static', filename='Preview.png') }}" alt="Card Preview" class="img-fluid w-100">
     </div>
   </div>
 </div>
