@@ -82,8 +82,10 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['To'] = to_email
     image_cid = make_msgid(domain='amember.local')[1:-1]
 
+    contact_info = '''<div style="text-align:left;"><br>Warm Regards,<br>Customer Care & Complaints Management<br>Operation Department<br><br>Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>A Life Insurance Company Limited<br>3rd Floor (A), No. (108), Corner of<br>Kabaraye Pagoda Road and Nat Mauk Road,<br>Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>'''
     html_body = f"""
-    <html><body><p>{body_text}</p><img src=\"cid:{image_cid}\"></body></html>
+    <html><body><img src=\"cid:{image_cid}\"><p>{body_text}</p>{contact_info}
+    </body></html>
     """
     msg.set_content(body_text)
     msg.add_alternative(html_body, subtype='html')
@@ -95,6 +97,15 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             )
     except Exception as e:
         logging.error(f"Embed image failed: {e}")
+
+    # Add Email.jpg as an additional attachment
+    email_img_path = os.path.join('static', 'Email.jpg')
+    if os.path.exists(email_img_path):
+        try:
+            with open(email_img_path, 'rb') as img:
+                msg.add_attachment(img.read(), maintype='image', subtype='jpeg', filename='Email.jpg')
+        except Exception as e:
+            logging.error(f"Attach Email.jpg failed: {e}")
 
     if attachment_path and os.path.exists(attachment_path):
         try:
