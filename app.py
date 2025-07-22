@@ -98,7 +98,6 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     except Exception as e:
         logging.error(f"Embed image failed: {e}")
 
-    # Add Email.jpg as an additional attachment
     email_img_path = os.path.join('static', 'Email.jpg')
     if os.path.exists(email_img_path):
         try:
@@ -160,7 +159,7 @@ def generate_cards_from_df(df, output_folder):
 
             if email:
                 subject = f"Your A-Member Card Awaits You ({'VIP' if vip_status == 'yes' else 'Regular'})"
-                send_email_with_attachment(email, subject, "Welcome to A-Member!", filename)
+                send_email_with_attachment(email, subject, filename)
 
 def zip_folder(folder_path, zip_path):
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
