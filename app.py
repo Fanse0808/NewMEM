@@ -98,13 +98,13 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     except Exception as e:
         logging.error(f"Embed image failed: {e}")
 
-    email_img_path = os.path.join('static', 'Email.jpg')
+    email_img_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(email_img_path):
         try:
             with open(email_img_path, 'rb') as img:
-                msg.add_attachment(img.read(), maintype='image', subtype='jpeg', filename='Email.jpg')
+                msg.add_attachment(img.read(), maintype='image', subtype='jpeg', filename='Redemption.jpg')
         except Exception as e:
-            logging.error(f"Attach Email.jpg failed: {e}")
+            logging.error(f"Attach Redemption.jpg failed: {e}")
 
     if attachment_path and os.path.exists(attachment_path):
         try:
