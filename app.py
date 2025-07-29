@@ -93,32 +93,28 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>
     </div>"""
 
-    email_body_path = os.path.join('static', 'EmailBody.jpg')
     image_cid = "email_body_image"
-    
     html_body = f"""
     <html>
-        <body>
-            <img src="cid:{image_cid}" style="max-width:100%;" alt="Email Body Image"><br>
+        <body style="margin:0; padding:0;">
+            <img src="cid:{image_cid}" style="width:100%; display:block;" alt="Email Body Image"><br>
             <p>{body_text}</p>
             {contact_info}
         </body>
     </html>
     """
-    msg.set_content(body_text or "Please view this email in HTML format.")
-    msg.add_alternative(html_body, subtype='html')
 
+    html_part = msg.add_alternative(html_body, subtype='html')
+
+    email_body_path = os.path.join('static', 'EmailBody.jpg')
     if os.path.exists(email_body_path):
         with open(email_body_path, 'rb') as f:
-            for part in msg.iter_parts():
-                if part.get_content_type() == 'text/html':
-                    part.add_related(
-                        f.read(),
-                        maintype='image',
-                        subtype='jpeg',
-                        cid=f"<{image_cid}>"
-                    )
-                    break
+            html_part.add_related(
+                f.read(),
+                maintype='image',
+                subtype='jpeg',
+                cid=f"<{image_cid}>"
+            )
 
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
