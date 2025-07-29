@@ -93,14 +93,18 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>
     </div>"""
 
-    # Embed EmailBody.jpg as inline (invisible in previews)
-    email_body_path = os.path.join('static', 'EmailBody.jpg')
-    image_cid = f"email_body_{int(time.time())}"
+    # Embed EmailBody.jpg as base64 directly in HTML (invisible in previews, displays inline)
+    email_body_path = os.path.join('static', 'EmailBody_compressed.jpg')
+    image_data = ""
+    if os.path.exists(email_body_path):
+        import base64
+        with open(email_body_path, 'rb') as f:
+            image_data = base64.b64encode(f.read()).decode('utf-8')
     
     html_body = f"""
     <html>
         <body>
-            <img src="cid:{image_cid}" style="max-width:100%;" alt="Email Body Image"><br>
+            <img src="data:image/jpeg;base64,{image_data}" style="max-width:100%;" alt="Email Body Image"><br>
             <p>{body_text}</p>
             {contact_info}
         </body>
@@ -108,20 +112,6 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     """
     msg.set_content(body_text or "Please view this email in HTML format.")
     msg.add_alternative(html_body, subtype='html')
-
-    # Add EmailBody.jpg as inline attachment (invisible)
-    if os.path.exists(email_body_path):
-        with open(email_body_path, 'rb') as f:
-            inline_part = msg.get_payload()[1].add_related(
-                f.read(),
-                maintype='image',
-                subtype='jpeg',
-                cid=f"<{image_cid}>"
-            )
-            inline_part['Content-Disposition'] = 'inline'
-            # Remove filename to make it invisible
-            if 'filename' in inline_part:
-                del inline_part['filename']
 
     # Redemption.jpg as normal attachment
     redemption_path = os.path.join('static', 'Redemption.jpg')
