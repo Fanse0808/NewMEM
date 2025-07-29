@@ -77,8 +77,18 @@ from email.mime.image import MIMEImage
 from email.mime.base import MIMEBase
 from email import encoders
 
+import os
+import smtplib
+import logging
+import base64
+import mimetypes
+from email.mime.multipart import MIMEMultipart  # Missing import added
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+from email.mime.base import MIMEBase
+from email import encoders
+
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
-    # SMTP configuration
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
     smtp_user = os.environ.get('SMTP_USER')
@@ -96,8 +106,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
 
     msg_alternative = MIMEMultipart('alternative')
     msg.attach(msg_alternative)
-    
-    # Plain text part
+
     text_part = MIMEText(body_text, 'plain')
     msg_alternative.attach(text_part)
 
@@ -124,7 +133,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
 
     html_part = MIMEText(html_content, 'html')
     msg_alternative.attach(html_part)
-    
+
     try:
         redemption_path = os.path.join('static', 'Redemption.jpg')
         if os.path.exists(redemption_path):
@@ -138,8 +147,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                 msg.attach(redemption_part)
     except Exception as e:
         logging.error(f"Error attaching Redemption.jpg: {e}")
-    
-    # Attach custom attachment if provided
+
     if attachment_path and os.path.exists(attachment_path):
         try:
             with open(attachment_path, 'rb') as f:
