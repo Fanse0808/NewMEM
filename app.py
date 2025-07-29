@@ -109,12 +109,17 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     email_body_path = os.path.join('static', 'EmailBody.jpg')
     if os.path.exists(email_body_path):
         with open(email_body_path, 'rb') as f:
-            html_part.add_related(
+            inline_part = html_part.add_related(
                 f.read(),
                 maintype='image',
                 subtype='jpeg',
                 cid=f"<{image_cid}>"
             )
+            # Make EmailBody.jpg invisible in previews
+            inline_part['Content-Disposition'] = 'inline'
+            # Remove filename to prevent "(noname)" from appearing
+            if 'filename' in inline_part:
+                del inline_part['filename']
 
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
