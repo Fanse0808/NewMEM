@@ -8,6 +8,11 @@ import time
 import logging
 import smtplib
 import mimetypes
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+from email.mime.base import MIMEBase
+from email import encoders
 from email.message import EmailMessage
 from email.utils import make_msgid
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file
@@ -65,28 +70,6 @@ def format_card_id(card_id):
     chars = cleaned[:3].ljust(3, 'X')
     numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
     return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
-
-import os
-import smtplib
-import logging
-import base64
-import mimetypes
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
-from email.mime.base import MIMEBase
-from email import encoders
-
-import os
-import smtplib
-import logging
-import base64
-import mimetypes
-from email.mime.multipart import MIMEMultipart  # Missing import added
-from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
-from email.mime.base import MIMEBase
-from email import encoders
 
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
     smtp_server = os.environ.get('SMTP_SERVER')
