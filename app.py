@@ -11,7 +11,6 @@ import mimetypes
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
-from email.mime.base import MIMEBase
 from email import encoders
 from email.message import EmailMessage
 from email.utils import make_msgid
@@ -81,21 +80,20 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     smtp_user = os.environ.get('SMTP_USER')
     smtp_password = os.environ.get('SMTP_PASSWORD')
 
-    # Root message (mixed for attachments)
     msg_root = MIMEMultipart('mixed')
     msg_root['Subject'] = subject
     msg_root['From'] = smtp_user
     msg_root['To'] = to_email
 
-    # Alternative part (text + HTML)
-    msg_alternative = MIMEMultipart('alternative')
-    msg_root.attach(msg_alternative)
+    msg_related = MIMEMultipart('related')
+    msg_root.attach(msg_related)
 
-    # Plain text part
+    msg_alternative = MIMEMultipart('alternative')
+    msg_related.attach(msg_alternative)
+
     msg_alternative.attach(MIMEText(body_text, 'plain'))
 
-    # Build URL for hosted memberinfo.jpg
-    memberinfo_url = url_for('static', filename='memberinfo.jpg', _external=True)
+    image_cid = make_msgid(domain='example.com')[1:-1]
 
     contact_info = """<div style='text-align:left;'><br>Warm Regards,<br>
     Customer Care & Complaints Management<br>Operation Department<br><br>
