@@ -15,7 +15,7 @@ from email.message import EmailMessage
 from email.mime.base import MIMEBase
 from email import encoders
 
-from flask import Flask, render_template, request, redirect, flash, send_file, after_this_request
+from flask import Flask, render_template, request, redirect, flash, send_file, after_this_request, url_for
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 
@@ -52,7 +52,7 @@ if not os.path.exists(SAMPLE_CSV_PATH):
     with open(SAMPLE_CSV_PATH, 'w') as f:
         f.write("Name,Card,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\n"
                 "Jane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com")
-        
+
 # ---- Utility Functions ----
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xlsx', 'csv'}
@@ -98,11 +98,11 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             buffer.seek(0)
             return base64.b64encode(buffer.read()).decode('utf-8')
 
-    # Base64 embed both images
+    # Base64 embed images inline in email body
     memberinfo_base64 = embed_image_base64(os.path.join('static', 'memberinfo.jpg'))
     redemption_base64 = embed_image_base64(os.path.join('static', 'Redemption.jpg'))
 
-    # Contact Info block
+    # Contact info block
     contact_info = """<div style='text-align:left;'><br>Warm Regards,<br>
     Customer Care & Complaints Management<br>Operation Department<br><br>
     Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>
@@ -110,7 +110,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     Kabaraye Pagoda Road and Nat Mauk Road,<br>
     Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>"""
 
-    # Email HTML (inline images)
+    # Compose HTML email body with inline images (no attachments for these)
     html_body = f"""
     <html><body>
         <img src="data:image/jpeg;base64,{memberinfo_base64}" style="max-width:100%;"><br>
@@ -120,11 +120,11 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     </body></html>
     """
 
-    # Plain + HTML
+    # Plain text + HTML alternative
     msg.set_content(body_text)
     msg.add_alternative(html_body, subtype='html')
 
-    # Optional card attachment
+    # Attach the card image if provided
     if attachment_path and os.path.exists(attachment_path):
         with open(attachment_path, 'rb') as f:
             mime_type, _ = mimetypes.guess_type(attachment_path)
@@ -135,7 +135,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
             msg.attach(attachment)
 
-    # Send email
+    # Send email via SMTP
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
@@ -145,7 +145,6 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         logging.info(f"✅ Email sent to {to_email}")
     except Exception as e:
         logging.error(f"❌ SMTP send failed: {e}")
-
 
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
@@ -248,7 +247,7 @@ def index():
                 return send_file(zip_path, as_attachment=True, download_name='cards.zip')
 
             except Exception as e:
-                print(traceback.format_exc())   # Full error in terminal
+                logging.error(traceback.format_exc())   # Full error in terminal/logs
                 flash(f"Processing error: {e}")
                 return redirect(request.url)
 
