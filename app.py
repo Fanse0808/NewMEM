@@ -70,11 +70,6 @@ def format_card_id(card_id):
     numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
     return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
 
-import os, smtplib, mimetypes, logging
-from email.message import EmailMessage
-from email.utils import make_msgid
-
-
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
