@@ -87,11 +87,10 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['From'] = from_email
     msg['To'] = to_email
 
-    msg_alternative = MIMEMultipart('alternative')
-    msg.attach(msg_alternative)
+    alternative = MIMEMultipart('alternative')
+    msg.attach(alternative)
 
-    text_part = MIMEText(body_text, 'plain')
-    msg_alternative.attach(text_part)
+    alternative.attach(MIMEText(body_text, 'plain'))
 
     contact_info = (
         "<div style=\"text-align:left;\"><br>"
@@ -104,22 +103,23 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     html_content = f"""
     <html>
         <body>
-            <img src="cid:memberinfo" style="max-width:100%;" alt="Member Info">
+            <!-- Important text appears BEFORE images in source -->
             <p>{body_text}</p>
             {contact_info}
+            <img src="cid:memberinfo" style="max-width:100%;" alt="Member Card">
         </body>
     </html>
     """
-    html_part = MIMEText(html_content, 'html')
-    msg_alternative.attach(html_part)
+    alternative.attach(MIMEText(html_content, 'html'))
 
     try:
         memberinfo_path = os.path.join('static', 'memberinfo.jpg')
         if os.path.exists(memberinfo_path):
             with open(memberinfo_path, 'rb') as img_file:
-                img = MIMEImage(img_file.read(), name=os.path.basename(memberinfo_path))
+                img = MIMEImage(img_file.read())
                 img.add_header('Content-ID', '<memberinfo>')
-                img.add_header('Content-Disposition', 'inline', filename=os.path.basename(memberinfo_path))
+                # CRITICAL: No filename in Content-Disposition
+                img.add_header('Content-Disposition', 'inline')
                 msg.attach(img)
     except Exception as e:
         logging.error(f"Error embedding memberinfo.jpg: {e}")
@@ -128,36 +128,29 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         redemption_path = os.path.join('static', 'Redemption.jpg')
         if os.path.exists(redemption_path):
             with open(redemption_path, 'rb') as img_file:
-                redemption_img = MIMEImage(img_file.read(), name=os.path.basename(redemption_path))
-                redemption_img.add_header(
+                attach = MIMEImage(img_file.read())
+                attach.add_header(
                     'Content-Disposition',
                     'attachment',
-                    filename=os.path.basename(redemption_path)
+                    filename="Redemption.jpg"  # Keep filename for actual attachments
                 )
-                msg.attach(redemption_img)
+                msg.attach(attach)
     except Exception as e:
         logging.error(f"Error attaching Redemption.jpg: {e}")
 
     if attachment_path and os.path.exists(attachment_path):
         try:
             with open(attachment_path, 'rb') as f:
-                mime_type, _ = mimetypes.guess_type(attachment_path)
-                if mime_type:
-                    maintype, subtype = mime_type.split('/')
-                else:
-                    maintype, subtype = 'application', 'octet-stream'
-
-                attachment_part = MIMEBase(maintype, subtype)
-                attachment_part.set_payload(f.read())
-                encoders.encode_base64(attachment_part)
-                attachment_part.add_header(
+                part = MIMEBase(*mimetypes.guess_type(attachment_path)[0].split('/'))
+                part.set_payload(f.read())
+                encoders.encode_base64(part)
+                part.add_header(
                     'Content-Disposition',
-                    'attachment',
-                    filename=os.path.basename(attachment_path)
+                    f'attachment; filename="{os.path.basename(attachment_path)}"'
                 )
-                msg.attach(attachment_part)
+                msg.attach(part)
         except Exception as e:
-            logging.error(f"Error attaching custom file: {e}")
+            logging.error(f"Attachment error: {e}")
 
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
@@ -165,9 +158,9 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             if smtp_password:
                 server.login(smtp_user, smtp_password)
             server.send_message(msg)
-        logging.info(f"Email successfully sent to {to_email}")
+        logging.info(f"Email sent to {to_email}")
     except Exception as e:
-        logging.error(f"SMTP send failed: {e}")
+        logging.error(f"SMTP failed: {e}")
         
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
