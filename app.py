@@ -93,7 +93,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>
     </div>"""
 
-    email_body_path = os.path.join('static', 'EmailBody_compressed.jpg')
+    email_body_path = os.path.join('static', 'EmailBody.jpg')
     image_cid = "email_body_image"
     
     html_body = f"""
