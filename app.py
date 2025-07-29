@@ -98,7 +98,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     Kabaraye Pagoda Road and Nat Mauk Road,<br>
     Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>"""
 
-   html_body = f"""
+    html_body = f"""
     <html><body>
         <img src="cid:{image_cid}" style="max-width:100%;">
         <p>{body_text}</p>
@@ -108,17 +108,15 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
 
   msg_alternative.attach(MIMEText(html_body, 'html'))
 
-    # Attach memberinfo.jpg inline
     try:
         with open(os.path.join('static', 'memberinfo.jpg'), 'rb') as img_file:
             img = MIMEImage(img_file.read(), _subtype='jpeg')
             img.add_header('Content-ID', f'<{image_cid}>')
-            img.add_header('Content-Disposition', 'inline')
+            img.add_header('Content-Disposition', 'inline')  # No filename here!
             msg_related.attach(img)
     except Exception as e:
         logging.error(f"Failed to attach inline memberinfo.jpg: {e}")
 
-    # Attach Redemption.jpg as attachment
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         try:
@@ -129,7 +127,6 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         except Exception as e:
             logging.error(f"Failed to attach Redemption.jpg: {e}")
 
-    # Attach card file ONLY if it is an image
     if attachment_path and os.path.exists(attachment_path):
         try:
             mime_type, _ = mimetypes.guess_type(attachment_path)
@@ -139,7 +136,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                     card_img.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
                     msg_root.attach(card_img)
             else:
-                logging.warning(f"Attachment {attachment_path} is not an image. Skipping to avoid MIMEBase usage.")
+                logging.warning(f"Attachment {attachment_path} is not an image; skipping attachment.")
         except Exception as e:
             logging.error(f"Failed to attach card file: {e}")
 
