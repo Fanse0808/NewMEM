@@ -67,30 +67,28 @@ def format_card_id(card_id):
     numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
     return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
 
+import os, smtplib, mimetypes, logging
+from email.message import EmailMessage
+from email.utils import make_msgid
+
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
     smtp_user = os.environ.get('SMTP_USER')
     smtp_password = os.environ.get('SMTP_PASSWORD')
-    from_email = smtp_user
-
-    if not all([smtp_server, smtp_user]):
-        logging.error("SMTP config missing")
-        return
 
     msg = EmailMessage()
     msg['Subject'] = subject
-    msg['From'] = from_email
+    msg['From'] = smtp_user
     msg['To'] = to_email
 
     image_cid = make_msgid(domain='amember.local')[1:-1]
 
-    contact_info = '''<div style="text-align:left;"><br>Warm Regards,<br>
-    Customer Care & Complaints Management<br>Operation Department<br><br>
-    Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>
+    contact_info = """<div style='text-align:left;'><br>Warm Regards,<br>Customer Care & Complaints Management
+    <br>Operation Department<br><br>Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>
     A Life Insurance Company Limited<br>3rd Floor (A), No. (108), Corner of<br>
     Kabaraye Pagoda Road and Nat Mauk Road,<br>
-    Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>'''
+    Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>"""
 
     html_body = f"""
     <html><body>
@@ -109,48 +107,38 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                 maintype='image',
                 subtype='jpeg',
                 cid=f"<{image_cid}>",
-                disposition='inline',  # <--- KEY to avoid noname attachment
-                filename='memberinfo.jpg'  # Optional: name (not shown as attachment)
+                disposition='inline',           # <--- Forces inline
+                filename='memberinfo.jpg'       # Helps avoid 'noname'
             )
     except Exception as e:
         logging.error(f"Embed image failed: {e}")
 
-    email_img_path = os.path.join('static', 'Redemption.jpg')
-    if os.path.exists(email_img_path):
-        try:
-            with open(email_img_path, 'rb') as img:
-                msg.add_attachment(
-                    img.read(),
-                    maintype='image',
-                    subtype='jpeg',
-                    filename='Redemption.jpg'
-                )
-        except Exception as e:
-            logging.error(f"Attach Redemption.jpg failed: {e}")
+    redemption_path = os.path.join('static', 'Redemption.jpg')
+    if os.path.exists(redemption_path):
+        with open(redemption_path, 'rb') as img:
+            msg.add_attachment(
+                img.read(),
+                maintype='image',
+                subtype='jpeg',
+                filename='Redemption.jpg'
+            )
 
     if attachment_path and os.path.exists(attachment_path):
-        try:
-            with open(attachment_path, 'rb') as f:
-                mime_type, _ = mimetypes.guess_type(attachment_path)
-                maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-                msg.add_attachment(
-                    f.read(),
-                    maintype=maintype,
-                    subtype=subtype,
-                    filename=os.path.basename(attachment_path)
-                )
-        except Exception as e:
-            logging.error(f"Attach card failed: {e}")
+        with open(attachment_path, 'rb') as f:
+            mime_type, _ = mimetypes.guess_type(attachment_path)
+            maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
+            msg.add_attachment(
+                f.read(),
+                maintype=maintype,
+                subtype=subtype,
+                filename=os.path.basename(attachment_path)
+            )
 
-    try:
-        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
-            server.starttls()
-            if smtp_password:
-                server.login(smtp_user, smtp_password)
-            server.send_message(msg)
-        logging.info(f"Email sent to {to_email}")
-    except Exception as e:
-        logging.error(f"SMTP send failed: {e}")
+    with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
+        server.starttls()
+        if smtp_password:
+            server.login(smtp_user, smtp_password)
+        server.send_message(msg)
         
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
