@@ -68,14 +68,9 @@ def format_card_id(card_id):
     numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
     return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
 
-import os
-import smtplib
-import mimetypes
-import logging
 import base64
 from io import BytesIO
 from PIL import Image
-from email.message import EmailMessage
 from email.mime.base import MIMEBase
 from email import encoders
 
@@ -116,7 +111,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     Kabaraye Pagoda Road and Nat Mauk Road,<br>
     Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>"""
 
-    # Base64 embed
+    # Base64 embed (no attachments)
     html_body = f"""
     <html><body>
         <img src="data:image/jpeg;base64,{memberinfo_base64}" style="max-width:100%;">
