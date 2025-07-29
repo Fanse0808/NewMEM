@@ -91,10 +91,15 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg.add_alternative(html_body, subtype='html')
 
     try:
-        with open(os.path.join('static', 'memberinfo.jpg'), 'rb') as img:
-            msg.get_payload()[1].add_related(
-                img.read(), maintype='image', subtype='jpeg', cid=image_cid
-            )
+        memberinfo_path = os.path.join('static', 'memberinfo.jpg')
+        if os.path.exists(memberinfo_path):
+            with open(memberinfo_path, 'rb') as img:
+                msg.get_payload()[1].add_related(
+                    img.read(), 
+                    maintype='image', 
+                    subtype='jpeg', 
+                    cid=image_cid
+                )
     except Exception as e:
         logging.error(f"Embed image failed: {e}")
 
