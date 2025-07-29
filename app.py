@@ -8,20 +8,24 @@ import time
 import logging
 import smtplib
 import mimetypes
+import base64
+import traceback
+from io import BytesIO
+from email.message import EmailMessage
 from email.mime.base import MIMEBase
 from email import encoders
-from email.message import EmailMessage
-from email.utils import make_msgid
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file
+
+from flask import Flask, render_template, request, redirect, flash, send_file
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 
 # Logging
 logging.basicConfig(level=logging.INFO)
 
-# App Setup
+# Flask Setup
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'supersecretkey')
+
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'web_cards'
 SAMPLE_CSV_PATH = 'static/sample_cards.csv'
@@ -43,12 +47,13 @@ FONT_SIZE_LABEL = 18
 for folder in (UPLOAD_FOLDER, OUTPUT_FOLDER, 'static'):
     os.makedirs(folder, exist_ok=True)
 
-# Create sample CSV
+# Create sample CSV if not exists
 if not os.path.exists(SAMPLE_CSV_PATH):
     with open(SAMPLE_CSV_PATH, 'w') as f:
-        f.write("Name,Card,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\nJane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com")
+        f.write("Name,Card,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\n"
+                "Jane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com")
 
-# --- Utility Functions ---
+# ---- Utility Functions ----
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xlsx', 'csv'}
 
@@ -68,12 +73,6 @@ def format_card_id(card_id):
     numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
     return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
 
-import base64
-from io import BytesIO
-from PIL import Image
-from email.mime.base import MIMEBase
-from email import encoders
-
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
@@ -85,23 +84,18 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['From'] = smtp_user
     msg['To'] = to_email
 
-    # Compress and Base64 encode memberinfo.jpg
+    # Base64 Embed memberinfo.jpg
     memberinfo_path = os.path.join('static', 'memberinfo.jpg')
     memberinfo_base64 = ""
     if os.path.exists(memberinfo_path):
         with Image.open(memberinfo_path) as img:
-            # Resize if larger than 1000px wide
-            max_width = 1000
-            if img.width > max_width:
-                ratio = max_width / img.width
-                img = img.resize((max_width, int(img.height * ratio)))
+            if img.width > 1000:
+                ratio = 1000 / img.width
+                img = img.resize((1000, int(img.height * ratio)))
 
-            # Save to buffer at lower quality (70)
             buffer = BytesIO()
             img.save(buffer, format="JPEG", optimize=True, quality=70)
             buffer.seek(0)
-
-            # Convert to Base64
             memberinfo_base64 = base64.b64encode(buffer.read()).decode('utf-8')
 
     contact_info = """<div style='text-align:left;'><br>Warm Regards,<br>
@@ -111,15 +105,13 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     Kabaraye Pagoda Road and Nat Mauk Road,<br>
     Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>"""
 
-    # Base64 embed (no attachments)
     html_body = f"""
     <html><body>
-        <img src="data:image/jpeg;base64,{memberinfo_base64}" style="max-width:100%;">
+        <img src="data:image/jpeg;base64,{memberinfo_base64}" style="max-width:100%;"><br>
         <p>{body_text}</p>
         {contact_info}
     </body></html>
     """
-
     msg.set_content(body_text)
     msg.add_alternative(html_body, subtype='html')
 
@@ -140,25 +132,23 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
             msg.attach(attachment)
 
-    # Send email
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
             if smtp_password:
                 server.login(smtp_user, smtp_password)
             server.send_message(msg)
-        logging.info(f"Email sent to {to_email}")
+        logging.info(f"✅ Email sent to {to_email}")
     except Exception as e:
-        logging.error(f"SMTP send failed: {e}")
+        logging.error(f"❌ SMTP send failed: {e}")
 
-        
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
     font_policy_no = load_font(FONT_PATH, FONT_SIZE_POLICY_NO)
     font_date = load_font(FONT_PATH, FONT_SIZE_DATE)
     font_name = load_font(FONT_PATH, FONT_SIZE_NAME)
 
-    for i, row in df.iterrows():
+    for _, row in df.iterrows():
         name = str(row.get('Name', 'Unknown'))
         Card = str(row.get('Card', 'Unknown'))
         date = str(row.get('Date', ''))
@@ -175,10 +165,8 @@ def generate_cards_from_df(df, output_folder):
             draw.text(POLICY_NO_POS, format_card_id(Card), font=font_policy_no, fill=WHITE)
             draw.text(VALID_UNTIL_LABEL_POS, "VALID", font=font_label, fill=WHITE)
             bbox = draw.textbbox(VALID_UNTIL_LABEL_POS, "VALID", font=font_label)
-            label_height = bbox[3] - bbox[1]
-            second_line_y = VALID_UNTIL_LABEL_POS[1] + label_height + 5
-            until_date_text = f"UNTIL - {date}"
-            draw.text((VALID_UNTIL_LABEL_POS[0], second_line_y), until_date_text, font=font_date, fill=WHITE)
+            draw.text((VALID_UNTIL_LABEL_POS[0], VALID_UNTIL_LABEL_POS[1] + bbox[3] - bbox[1] + 5),
+                      f"UNTIL - {date}", font=font_date, fill=WHITE)
             draw.text(NAME_POS, name, font=font_name, fill=WHITE)
 
             filename = os.path.join(output_folder, f"{sanitize_filename(name)}_{sanitize_filename(Card)}.png")
@@ -212,7 +200,7 @@ def clear_folders_periodically():
 if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
     threading.Thread(target=clear_folders_periodically, daemon=True).start()
 
-# Routes
+# ---- Routes ----
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -225,22 +213,31 @@ def index():
             try:
                 shutil.rmtree(OUTPUT_FOLDER, ignore_errors=True)
                 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
                 filepath = os.path.join(UPLOAD_FOLDER, file.filename)
                 file.save(filepath)
-                df = pd.read_excel(filepath, engine='openpyxl') if file.filename.endswith('.xlsx') else pd.read_csv(filepath)
+
+                df = (pd.read_excel(filepath, engine='openpyxl')
+                      if file.filename.endswith('.xlsx') else pd.read_csv(filepath))
+
                 if df.shape[1] < 3:
                     flash('File must have at least 3 columns')
                     return redirect(request.url)
+
                 generate_cards_from_df(df, OUTPUT_FOLDER)
+
                 with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_zip:
                     zip_folder(OUTPUT_FOLDER, tmp_zip.name)
                 return send_file(tmp_zip.name, as_attachment=True, download_name='cards.zip')
+
             except Exception as e:
+                print(traceback.format_exc())   # Full error in terminal
                 flash(f"Processing error: {e}")
                 return redirect(request.url)
-        else:
-            flash('Unsupported file type. Please use the template.')
-            return redirect(request.url)
+
+        flash('Unsupported file type. Please use the template.')
+        return redirect(request.url)
+
     return render_template('index.html')
 
 @app.route('/download_template')
@@ -265,5 +262,5 @@ def api_create_card():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5003))
-    logging.info(f"Starting Flask app on port {port}")
+    logging.info(f"🚀 Starting Flask app on port {port}")
     app.run(host='0.0.0.0', port=port, threaded=True)
