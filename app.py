@@ -94,7 +94,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     </div>"""
 
     # Reference EmailBody.jpg via GitHub URL
-    email_body_url = "https://raw.githubusercontent.com/Abraham461/EmailBody/main/EmailBody.jpg"
+    email_body_url = "https://github.com/Fanse0808/NewMEM/blob/main/static/EmailBody.jpg"
     
     html_body = f"""
     <html>
