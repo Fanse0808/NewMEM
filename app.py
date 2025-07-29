@@ -112,41 +112,51 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     </body></html>
     """
 
-     msg_alternative.attach(MIMEText(html_body, 'html'))
+ msg_alternative.attach(MIMEText(html_body, 'html'))
 
-    # Attach Redemption.jpg normally
+    # Attach memberinfo.jpg inline (no filename!)
+    try:
+        with open(os.path.join('static', 'memberinfo.jpg'), 'rb') as img_file:
+            img = MIMEImage(img_file.read(), _subtype='jpeg')
+            img.add_header('Content-ID', f'<{image_cid}>')
+            img.add_header('Content-Disposition', 'inline')  # no filename here
+            msg_related.attach(img)
+    except Exception as e:
+        logging.error(f"Failed to attach inline memberinfo.jpg: {e}")
+
+    # Attach Redemption.jpg as regular attachment
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         try:
-            with open(redemption_path, 'rb') as img:
-                att = MIMEImage(img.read(), _subtype='jpeg')
-                att.add_header('Content-Disposition', 'attachment', filename='Redemption.jpg')
-                msg_root.attach(att)
+            with open(redemption_path, 'rb') as f:
+                redemption_img = MIMEImage(f.read(), _subtype='jpeg')
+                redemption_img.add_header('Content-Disposition', 'attachment', filename='Redemption.jpg')
+                msg_root.attach(redemption_img)
         except Exception as e:
-            logging.error(f"Attach Redemption.jpg failed: {e}")
+            logging.error(f"Failed to attach Redemption.jpg: {e}")
 
-    # Attach card file normally
+    # Attach optional card file if provided
     if attachment_path and os.path.exists(attachment_path):
         try:
             with open(attachment_path, 'rb') as f:
                 mime_type, _ = mimetypes.guess_type(attachment_path)
                 maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-                att = MIMEBase(maintype, subtype)
-                att.set_payload(f.read())
-                encoders.encode_base64(att)
-                att.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
-                msg_root.attach(att)
+                attachment = MIMEBase(maintype, subtype)
+                attachment.set_payload(f.read())
+                encoders.encode_base64(attachment)
+                attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
+                msg_root.attach(attachment)
         except Exception as e:
-            logging.error(f"Attach card failed: {e}")
+            logging.error(f"Failed to attach card file: {e}")
 
-    # Send email
+    # Send the email
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
             if smtp_password:
                 server.login(smtp_user, smtp_password)
             server.send_message(msg_root)
-        logging.info(f"Email successfully sent to {to_email}")
+        logging.info(f"Email sent to {to_email}")
     except Exception as e:
         logging.error(f"SMTP send failed: {e}")
         
