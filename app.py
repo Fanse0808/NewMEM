@@ -99,7 +99,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     html_body = f"""
     <html>
         <body>
-            <img src=\"{email_body_url}\" style=\"max-width:100%;\"><br>
+            <img src="https://raw.githubusercontent.com/user/repo/main/static/EmailBody.jpg" style="max-width:100%;">
             <p>{body_text}</p>
             {contact_info}
         </body>
