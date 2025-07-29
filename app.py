@@ -77,58 +77,64 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     smtp_user = os.environ.get('SMTP_USER')
     smtp_password = os.environ.get('SMTP_PASSWORD')
     from_email = smtp_user
-    
-    if not all([smtp_server, smtp_port, smtp_user]):
+
+    if not all([smtp_server, smtp_user]):
         logging.error("SMTP configuration is incomplete")
         return
 
-    msg = MIMEMultipart('mixed')
+    msg = MIMEMultipart('related')
     msg['Subject'] = subject
     msg['From'] = from_email
     msg['To'] = to_email
 
     msg_alternative = MIMEMultipart('alternative')
     msg.attach(msg_alternative)
-    
-    # Plain text part
+
     text_part = MIMEText(body_text, 'plain')
     msg_alternative.attach(text_part)
 
-    memberinfo_base64 = ""
-    try:
-        memberinfo_path = os.path.join('static', 'memberinfo.jpg')
-        if os.path.exists(memberinfo_path):
-            with open(memberinfo_path, 'rb') as img:
-                memberinfo_base64 = base64.b64encode(img.read()).decode('utf-8')
-    except Exception as e:
-        logging.error(f"Error processing memberinfo.jpg: {e}")
-  
-    contact_info = '''<div style="text-align:left;"><br>Warm Regards,<br>Customer Care & Complaints Management<br>Operation Department<br><br>Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>A Life Insurance Company Limited<br>3rd Floor (A), No. (108), Corner of<br>Kabaraye Pagoda Road and Nat Mauk Road,<br>Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>'''
-    
+    contact_info = (
+        "<div style=\"text-align:left;\"><br>"
+        "Warm Regards,<br>Customer Care & Complaints Management<br>Operation Department<br><br>"
+        "Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>"
+        "A Life Insurance Company Limited<br>3rd Floor (A), No. (108), Corner of<br>"
+        "Kabaraye Pagoda Road and Nat Mauk Road,<br>Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>"
+        "</div>"
+    )
     html_content = f"""
     <html>
         <body>
-            <img src="data:image/jpeg;base64,{memberinfo_base64}" style="max-width:100%;">
+            <img src="cid:memberinfo" style="max-width:100%;" alt="Member Info">
             <p>{body_text}</p>
             {contact_info}
         </body>
     </html>
     """
-
     html_part = MIMEText(html_content, 'html')
     msg_alternative.attach(html_part)
 
     try:
+        memberinfo_path = os.path.join('static', 'memberinfo.jpg')
+        if os.path.exists(memberinfo_path):
+            with open(memberinfo_path, 'rb') as img_file:
+                img = MIMEImage(img_file.read(), name=os.path.basename(memberinfo_path))
+                img.add_header('Content-ID', '<memberinfo>')
+                img.add_header('Content-Disposition', 'inline', filename=os.path.basename(memberinfo_path))
+                msg.attach(img)
+    except Exception as e:
+        logging.error(f"Error embedding memberinfo.jpg: {e}")
+
+    try:
         redemption_path = os.path.join('static', 'Redemption.jpg')
         if os.path.exists(redemption_path):
-            with open(redemption_path, 'rb') as img:
-                redemption_part = MIMEImage(img.read(), 'jpeg')
-                redemption_part.add_header(
-                    'Content-Disposition', 
-                    'attachment', 
-                    filename='Redemption.jpg'
+            with open(redemption_path, 'rb') as img_file:
+                redemption_img = MIMEImage(img_file.read(), name=os.path.basename(redemption_path))
+                redemption_img.add_header(
+                    'Content-Disposition',
+                    'attachment',
+                    filename=os.path.basename(redemption_path)
                 )
-                msg.attach(redemption_part)
+                msg.attach(redemption_img)
     except Exception as e:
         logging.error(f"Error attaching Redemption.jpg: {e}")
 
@@ -140,13 +146,13 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                     maintype, subtype = mime_type.split('/')
                 else:
                     maintype, subtype = 'application', 'octet-stream'
-                
+
                 attachment_part = MIMEBase(maintype, subtype)
                 attachment_part.set_payload(f.read())
                 encoders.encode_base64(attachment_part)
                 attachment_part.add_header(
-                    'Content-Disposition', 
-                    'attachment', 
+                    'Content-Disposition',
+                    'attachment',
                     filename=os.path.basename(attachment_path)
                 )
                 msg.attach(attachment_part)
@@ -162,7 +168,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         logging.info(f"Email successfully sent to {to_email}")
     except Exception as e:
         logging.error(f"SMTP send failed: {e}")
-
+        
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
     font_policy_no = load_font(FONT_PATH, FONT_SIZE_POLICY_NO)
