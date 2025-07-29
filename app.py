@@ -126,13 +126,14 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     html_part = MIMEText(html_body, 'html')
     related_part.attach(html_part)
 
-    # Add inline image as part of related content
+    # Add inline image WITHOUT FILENAME in headers
     email_body_path = os.path.join('static', 'EmailBody.jpg')
     if os.path.exists(email_body_path):
         with open(email_body_path, 'rb') as f:
             img = MIMEImage(f.read())
             img.add_header('Content-ID', f'<{image_cid}>')
-            img.add_header('Content-Disposition', 'inline', filename='EmailBody.jpg')
+            # Critical fix: Remove filename to make it invisible
+            img.add_header('Content-Disposition', 'inline')
             related_part.attach(img)
 
     # Add regular attachments
