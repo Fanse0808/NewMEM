@@ -188,7 +188,7 @@ def generate_cards_from_df(df, output_folder):
             card.save(filename, format='PNG')
 
             if email:
-                subject = f"Your A-Member Card Awaits You ({'VIP' if vip_status == 'yes' else 'Regular'})"
+                subject = f"Your A-Member Card Awaits You"
                 send_email_with_attachment(email, subject, "", filename)
 
 def zip_folder(folder_path, zip_path):
