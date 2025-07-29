@@ -53,6 +53,19 @@ if not os.path.exists(SAMPLE_CSV_PATH):
         f.write("Name,Card,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\n"
                 "Jane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com")
 
+def embed_image_base64(image_path, max_width=600, quality=50):
+    if not os.path.exists(image_path):
+        return ""
+    with Image.open(image_path) as img:
+        if img.width > max_width:
+            ratio = max_width / img.width
+            new_height = int(img.height * ratio)
+            img = img.resize((max_width, new_height))
+        buffer = BytesIO()
+        img.save(buffer, format="JPEG", optimize=True, quality=quality)
+        buffer.seek(0)
+        return base64.b64encode(buffer.read()).decode('utf-8')
+        
 # ---- Utility Functions ----
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xlsx', 'csv'}
