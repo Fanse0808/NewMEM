@@ -10,7 +10,9 @@ import smtplib
 import mimetypes
 import traceback
 import base64
-from email.message import EmailMessage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 
 from flask import Flask, render_template, request, redirect, flash, send_file, after_this_request
 import pandas as pd
@@ -76,7 +78,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     smtp_user = os.environ.get('SMTP_USER')
     smtp_password = os.environ.get('SMTP_PASSWORD')
 
-    msg = EmailMessage()
+    msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
     msg['From'] = smtp_user
     msg['To'] = to_email
@@ -104,44 +106,45 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     </html>
     """
 
-    msg.set_content(body_text or "Please view this email in HTML format.")
-    html_part = msg.add_alternative(html_body, subtype='html')
+    # Add text part
+    text_part = MIMEText(body_text or "Please view this email in HTML format.", 'plain')
+    msg.attach(text_part)
+    
+    # Add HTML part
+    html_part = MIMEText(html_body, 'html')
+    msg.attach(html_part)
 
     email_body_path = os.path.join('static', 'EmailBody.jpg')
     if os.path.exists(email_body_path):
         with open(email_body_path, 'rb') as f:
-            inline_part = html_part.add_related(
-                f.read(),
-                maintype='image',
-                subtype='jpeg',
-                cid=f"<{image_cid}>"
-            )
-            # Make EmailBody.jpg invisible in previews
-            inline_part['Content-Disposition'] = 'inline'
+            image_part = MIMEImage(f.read())
+            image_part.add_header('Content-ID', f'<{image_cid}>')
+            image_part.add_header('Content-Disposition', 'inline')
             # Remove filename to prevent "(noname)" from appearing
-            if 'filename' in inline_part:
-                del inline_part['filename']
+            if 'filename' in image_part:
+                del image_part['filename']
+            msg.attach(image_part)
 
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as f:
-            msg.add_attachment(
-                f.read(),
-                maintype='image',
-                subtype='jpeg',
-                filename='Redemption.jpg'
-            )
+            redemption_part = MIMEImage(f.read())
+            redemption_part.add_header('Content-Disposition', 'attachment', filename='Redemption.jpg')
+            msg.attach(redemption_part)
 
     if attachment_path and os.path.exists(attachment_path):
         with open(attachment_path, 'rb') as f:
             mime_type, _ = mimetypes.guess_type(attachment_path)
-            maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-            msg.add_attachment(
-                f.read(),
-                maintype=maintype,
-                subtype=subtype,
-                filename=os.path.basename(attachment_path)
-            )
+            if mime_type and mime_type.startswith('image/'):
+                attachment_part = MIMEImage(f.read())
+            else:
+                from email.mime.base import MIMEBase
+                from email import encoders
+                attachment_part = MIMEBase('application', 'octet-stream')
+                attachment_part.set_payload(f.read())
+                encoders.encode_base64(attachment_part)
+            attachment_part.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
+            msg.attach(attachment_part)
 
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
