@@ -73,19 +73,6 @@ def format_card_id(card_id):
     numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
     return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
 
-def embed_image_base64(image_path, max_width=600, quality=50):
-    if not os.path.exists(image_path):
-        return ""
-    with Image.open(image_path) as img:
-        if img.width > max_width:
-            ratio = max_width / img.width
-            new_height = int(img.height * ratio)
-            img = img.resize((max_width, new_height))
-        buffer = BytesIO()
-        img.save(buffer, format="JPEG", optimize=True, quality=quality)
-        buffer.seek(0)
-        return base64.b64encode(buffer.read()).decode('utf-8')
-
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
