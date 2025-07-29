@@ -8,10 +8,6 @@ import time
 import logging
 import smtplib
 import mimetypes
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
-from email.mime.base import MIMEBase
 from email import encoders
 from email.message import EmailMessage
 from email.utils import make_msgid
@@ -79,78 +75,72 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     from_email = smtp_user
 
     if not all([smtp_server, smtp_user]):
-        logging.error("SMTP configuration is incomplete")
+        logging.error("SMTP config missing")
         return
 
-    msg = MIMEMultipart('related')
+    msg = EmailMessage()
     msg['Subject'] = subject
     msg['From'] = from_email
     msg['To'] = to_email
 
-    alternative = MIMEMultipart('alternative')
-    msg.attach(alternative)
+    image_cid = make_msgid(domain='amember.local')[1:-1]
 
-    alternative.attach(MIMEText(body_text, 'plain'))
+    contact_info = '''<div style="text-align:left;"><br>Warm Regards,<br>
+    Customer Care & Complaints Management<br>Operation Department<br><br>
+    Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>
+    A Life Insurance Company Limited<br>3rd Floor (A), No. (108), Corner of<br>
+    Kabaraye Pagoda Road and Nat Mauk Road,<br>
+    Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>'''
 
-    contact_info = (
-        "<div style=\"text-align:left;\"><br>"
-        "Warm Regards,<br>Customer Care & Complaints Management<br>Operation Department<br><br>"
-        "Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>"
-        "A Life Insurance Company Limited<br>3rd Floor (A), No. (108), Corner of<br>"
-        "Kabaraye Pagoda Road and Nat Mauk Road,<br>Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>"
-        "</div>"
-    )
-    html_content = f"""
-    <html>
-        <body>
-            <!-- Important text appears BEFORE images in source -->
-            <p>{body_text}</p>
-            {contact_info}
-            <img src="cid:memberinfo" style="max-width:100%;" alt="Member Card">
-        </body>
-    </html>
+    html_body = f"""
+    <html><body>
+        <img src="cid:{image_cid}" style="max-width:100%;"><p>{body_text}</p>
+        {contact_info}
+    </body></html>
     """
-    alternative.attach(MIMEText(html_content, 'html'))
+
+    msg.set_content(body_text)
+    msg.add_alternative(html_body, subtype='html')
 
     try:
-        memberinfo_path = os.path.join('static', 'memberinfo.jpg')
-        if os.path.exists(memberinfo_path):
-            with open(memberinfo_path, 'rb') as img_file:
-                img = MIMEImage(img_file.read())
-                img.add_header('Content-ID', '<memberinfo>')
-                # CRITICAL: No filename in Content-Disposition
-                img.add_header('Content-Disposition', 'inline')
-                msg.attach(img)
+        with open(os.path.join('static', 'memberinfo.jpg'), 'rb') as img:
+            msg.get_payload()[1].add_related(
+                img.read(),
+                maintype='image',
+                subtype='jpeg',
+                cid=f"<{image_cid}>",
+                disposition='inline',  # <--- KEY to avoid noname attachment
+                filename='memberinfo.jpg'  # Optional: name (not shown as attachment)
+            )
     except Exception as e:
-        logging.error(f"Error embedding memberinfo.jpg: {e}")
+        logging.error(f"Embed image failed: {e}")
 
-    try:
-        redemption_path = os.path.join('static', 'Redemption.jpg')
-        if os.path.exists(redemption_path):
-            with open(redemption_path, 'rb') as img_file:
-                attach = MIMEImage(img_file.read())
-                attach.add_header(
-                    'Content-Disposition',
-                    'attachment',
-                    filename="Redemption.jpg"  # Keep filename for actual attachments
+    email_img_path = os.path.join('static', 'Redemption.jpg')
+    if os.path.exists(email_img_path):
+        try:
+            with open(email_img_path, 'rb') as img:
+                msg.add_attachment(
+                    img.read(),
+                    maintype='image',
+                    subtype='jpeg',
+                    filename='Redemption.jpg'
                 )
-                msg.attach(attach)
-    except Exception as e:
-        logging.error(f"Error attaching Redemption.jpg: {e}")
+        except Exception as e:
+            logging.error(f"Attach Redemption.jpg failed: {e}")
 
     if attachment_path and os.path.exists(attachment_path):
         try:
             with open(attachment_path, 'rb') as f:
-                part = MIMEBase(*mimetypes.guess_type(attachment_path)[0].split('/'))
-                part.set_payload(f.read())
-                encoders.encode_base64(part)
-                part.add_header(
-                    'Content-Disposition',
-                    f'attachment; filename="{os.path.basename(attachment_path)}"'
+                mime_type, _ = mimetypes.guess_type(attachment_path)
+                maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
+                msg.add_attachment(
+                    f.read(),
+                    maintype=maintype,
+                    subtype=subtype,
+                    filename=os.path.basename(attachment_path)
                 )
-                msg.attach(part)
         except Exception as e:
-            logging.error(f"Attachment error: {e}")
+            logging.error(f"Attach card failed: {e}")
 
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
@@ -160,7 +150,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             server.send_message(msg)
         logging.info(f"Email sent to {to_email}")
     except Exception as e:
-        logging.error(f"SMTP failed: {e}")
+        logging.error(f"SMTP send failed: {e}")
         
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
