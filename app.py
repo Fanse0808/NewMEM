@@ -93,13 +93,14 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>
     </div>"""
 
-    # Reference EmailBody.jpg via ImgBB URL
-    email_body_url = "https://i.ibb.co/bMxxc1bQ/Email-Body.jpg"
+    # Use inline attachment method (works better on mobile)
+    email_body_path = os.path.join('static', 'EmailBody.jpg')
+    image_cid = f"email_body_{int(time.time())}"
     
     html_body = f"""
     <html>
         <body>
-            <img src="{email_body_url}" style="max-width:100%;" alt="Email Body Image"><br>
+            <img src="cid:{image_cid}" style="max-width:100%;" alt="Email Body Image"><br>
             <p>{body_text}</p>
             {contact_info}
         </body>
@@ -107,6 +108,21 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     """
     msg.set_content(body_text or "Please view this email in HTML format.")
     msg.add_alternative(html_body, subtype='html')
+
+    # Add EmailBody.jpg as inline attachment (invisible in previews, works on mobile)
+    if os.path.exists(email_body_path):
+        with open(email_body_path, 'rb') as f:
+            inline_part = msg.get_payload()[1].add_related(
+                f.read(),
+                maintype='image',
+                subtype='jpeg',
+                cid=f"<{image_cid}>"
+            )
+            # Make it as invisible as possible
+            inline_part['Content-Disposition'] = 'inline'
+            # Remove filename to avoid showing in previews
+            if 'filename' in inline_part:
+                del inline_part['filename']
 
     # Redemption.jpg as normal attachment
     redemption_path = os.path.join('static', 'Redemption.jpg')
