@@ -82,29 +82,33 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['From'] = smtp_user
     msg['To'] = to_email
 
-    # Set normal text/HTML body (NOT inline)
-    msg.set_content(body_text or "Please see attachments.")
-
-    # Attach EmailBody.jpg as normal attachment so it shows in Gmail preview
+    # Embed EmailBody.jpg inline using CID
     email_body_path = os.path.join('static', 'EmailBody.jpg')
     if os.path.exists(email_body_path):
         with open(email_body_path, 'rb') as f:
-            msg.add_attachment(
-                f.read(),
-                maintype='image',
-                subtype='jpeg',
-                filename='EmailBody.jpg'   # This will be the preview name
-            )
+            img_data = f.read()
+        image_cid = make_msgid(domain='amember.local')[1:-1]  # remove < >
+        
+        html_body = f"""
+        <html>
+        <body>
+            <img src="cid:{image_cid}" style="max-width:100%;">
+            <p>{body_text or ''}</p>
+        </body>
+        </html>
+        """
+        msg.add_alternative(html_body, subtype='html')
+        # Attach as inline (not as attachment)
+        msg.get_payload()[0].add_related(img_data, maintype='image', subtype='jpeg', cid=f"<{image_cid}>")
+    else:
+        msg.set_content(body_text or "Please see attachments.")
 
     # Attach Redemption.jpg normally
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as f:
             msg.add_attachment(
-                f.read(),
-                maintype='image',
-                subtype='jpeg',
-                filename='Redemption.jpg'
+                f.read(), maintype='image', subtype='jpeg', filename='Redemption.jpg'
             )
 
     # Attach card file normally
@@ -114,15 +118,12 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                 mime_type, _ = mimetypes.guess_type(attachment_path)
                 maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
                 msg.add_attachment(
-                    f.read(),
-                    maintype=maintype,
-                    subtype=subtype,
-                    filename=os.path.basename(attachment_path)
+                    f.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(attachment_path)
                 )
         except Exception as e:
             logging.error(f"Attach card failed: {e}")
 
-    # Send email
+    # Send email with debug logging
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
