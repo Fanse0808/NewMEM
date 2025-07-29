@@ -79,8 +79,11 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['From'] = smtp_user
     msg['To'] = to_email
 
-    memberinfo_url = url_for('static', filename='memberinfo.jpg', _external=True)
-    
+    # Get memberinfo URL inside Flask app context
+    from your_flask_app import app  # adjust import if needed
+    with app.app_context():
+        memberinfo_url = url_for('static', filename='memberinfo.jpg', _external=True)
+
     contact_info = """<div style='text-align:left;'><br>Warm Regards,<br>
     Customer Care & Complaints Management<br>Operation Department<br><br>
     Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>
@@ -96,10 +99,10 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     </body></html>
     """
 
-  msg.set_content(body_text)
+    msg.set_content(body_text)
     msg.add_alternative(html_body, subtype='html')
-    
-   redemption_path = os.path.join('static', 'Redemption.jpg')
+
+    redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as img:
             msg.add_attachment(img.read(), maintype='image', subtype='jpeg', filename='Redemption.jpg')
