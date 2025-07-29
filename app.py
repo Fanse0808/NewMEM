@@ -84,29 +84,31 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['From'] = from_email
     msg['To'] = to_email
 
-    # --- Set memberinfo.jpg (or EmailBody.jpg) as email body content ---
-    email_body_path = os.path.join('static', 'EmailBody.jpg')  # change this to your memberinfo renamed image
+    # Set EmailBody.jpg as the primary email content
+    email_body_path = os.path.join('static', 'EmailBody.jpg')
     try:
         with open(email_body_path, 'rb') as f:
             body_data = f.read()
-        # Set the image itself as the email body, no text/html
         msg.set_content(body_data, maintype='image', subtype='jpeg')
     except Exception as e:
         logging.error(f"Failed to set EmailBody image as email content: {e}")
-        # fallback: set simple text
+        # Fallback to text content
         msg.set_content(body_text or "Please see attachments.")
 
-    # --- Attach Redemption.jpg normally ---
+    # Attach Redemption.jpg normally
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         try:
             with open(redemption_path, 'rb') as f:
                 data = f.read()
-            msg.add_attachment(data, maintype='image', subtype='jpeg', filename='Redemption.jpg')
+            msg.add_attachment(data, 
+                               maintype='image', 
+                               subtype='jpeg', 
+                               filename='Redemption.jpg')
         except Exception as e:
             logging.error(f"Attach Redemption.jpg failed: {e}")
 
-    # --- Attach card file normally ---
+    # Attach card file normally
     if attachment_path and os.path.exists(attachment_path):
         try:
             with open(attachment_path, 'rb') as f:
@@ -114,7 +116,10 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             mime_type, _ = mimetypes.guess_type(attachment_path)
             maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
             filename = os.path.basename(attachment_path)
-            msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=filename)
+            msg.add_attachment(data, 
+                               maintype=maintype, 
+                               subtype=subtype, 
+                               filename=filename)
         except Exception as e:
             logging.error(f"Attach card failed: {e}")
 
