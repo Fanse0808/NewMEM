@@ -15,7 +15,7 @@ from email.message import EmailMessage
 from email.mime.base import MIMEBase
 from email import encoders
 
-from flask import Flask, render_template, request, redirect, flash, send_file
+from flask import Flask, render_template, request, redirect, flash, send_file, after_this_request
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 
@@ -228,7 +228,19 @@ def index():
 
                 with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_zip:
                     zip_folder(OUTPUT_FOLDER, tmp_zip.name)
-                return send_file(tmp_zip.name, as_attachment=True, download_name='cards.zip')
+                    zip_path = tmp_zip.name
+
+                # Auto delete the zip after sending
+                @after_this_request
+                def remove_file(response):
+                    try:
+                        os.remove(zip_path)
+                        logging.info(f"🗑️ Deleted {zip_path}")
+                    except Exception as e:
+                        logging.error(f"Error deleting zip: {e}")
+                    return response
+
+                return send_file(zip_path, as_attachment=True, download_name='cards.zip')
 
             except Exception as e:
                 print(traceback.format_exc())   # Full error in terminal
