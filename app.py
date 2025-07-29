@@ -68,6 +68,17 @@ def format_card_id(card_id):
     numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
     return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
 
+import os
+import smtplib
+import mimetypes
+import logging
+import base64
+from io import BytesIO
+from PIL import Image
+from email.message import EmailMessage
+from email.mime.base import MIMEBase
+from email import encoders
+
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
@@ -79,10 +90,24 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['From'] = smtp_user
     msg['To'] = to_email
 
-    # Get memberinfo URL inside Flask app context
-    from your_flask_app import app  # adjust import if needed
-    with app.app_context():
-        memberinfo_url = url_for('static', filename='memberinfo.jpg', _external=True)
+    # Compress and Base64 encode memberinfo.jpg
+    memberinfo_path = os.path.join('static', 'memberinfo.jpg')
+    memberinfo_base64 = ""
+    if os.path.exists(memberinfo_path):
+        with Image.open(memberinfo_path) as img:
+            # Resize if larger than 1000px wide
+            max_width = 1000
+            if img.width > max_width:
+                ratio = max_width / img.width
+                img = img.resize((max_width, int(img.height * ratio)))
+
+            # Save to buffer at lower quality (70)
+            buffer = BytesIO()
+            img.save(buffer, format="JPEG", optimize=True, quality=70)
+            buffer.seek(0)
+
+            # Convert to Base64
+            memberinfo_base64 = base64.b64encode(buffer.read()).decode('utf-8')
 
     contact_info = """<div style='text-align:left;'><br>Warm Regards,<br>
     Customer Care & Complaints Management<br>Operation Department<br><br>
@@ -91,9 +116,10 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     Kabaraye Pagoda Road and Nat Mauk Road,<br>
     Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>"""
 
+    # Base64 embed
     html_body = f"""
     <html><body>
-        <img src="{memberinfo_url}" style="max-width:100%;">
+        <img src="data:image/jpeg;base64,{memberinfo_base64}" style="max-width:100%;">
         <p>{body_text}</p>
         {contact_info}
     </body></html>
@@ -102,6 +128,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg.set_content(body_text)
     msg.add_alternative(html_body, subtype='html')
 
+    # Attach Redemption.jpg
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as img:
@@ -118,7 +145,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
             msg.attach(attachment)
 
-    # Send the email
+    # Send email
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
@@ -128,6 +155,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         logging.info(f"Email sent to {to_email}")
     except Exception as e:
         logging.error(f"SMTP send failed: {e}")
+
         
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
