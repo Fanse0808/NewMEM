@@ -82,54 +82,68 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['From'] = smtp_user
     msg['To'] = to_email
 
-    # Embed EmailBody.jpg inline using CID with filename
+    # Contact info (added at bottom of email)
+    contact_info = """<div style='text-align:left;'><br>
+        Warm Regards,<br>
+        Customer Care & Complaints Management<br>
+        Operation Department<br><br>
+        Phone: +95 9791232222<br>
+        Email: customercare@alife.com.mm<br><br>
+        A Life Insurance Company Limited<br>
+        3rd Floor (A), No. (108), Corner of<br>
+        Kabaraye Pagoda Road and Nat Mauk Road,<br>
+        Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>
+    </div>"""
+
+    # CID for inline EmailBody.jpg
+    image_cid = make_msgid(domain='alife.com.mm')[1:-1]
+
+    # Build HTML body with inline image and contact_info
+    html_body = f"""
+    <html>
+        <body>
+            <img src="cid:{image_cid}" style="max-width:100%;"><br>
+            <p>{body_text}</p>
+            {contact_info}
+        </body>
+    </html>
+    """
+    msg.set_content(body_text or "Please view this email in HTML format.")
+    msg.add_alternative(html_body, subtype='html')
+
+    # Add EmailBody.jpg as inline (Content-Disposition: inline)
     email_body_path = os.path.join('static', 'EmailBody.jpg')
     if os.path.exists(email_body_path):
         with open(email_body_path, 'rb') as f:
-            img_data = f.read()
-        image_cid = make_msgid(domain='amember.local')[1:-1]  # remove < >
+            msg.get_payload()[1].add_related(
+                f.read(),
+                maintype='image',
+                subtype='jpeg',
+                cid=f"<{image_cid}>"
+            )
 
-        html_body = f"""
-        <html>
-        <body>
-            <img src="cid:{image_cid}" style="max-width:100%;">
-            <p>{body_text or ''}</p>
-        </body>
-        </html>
-        """
-        msg.add_alternative(html_body, subtype='html')
-
-        # Embed inline with filename so it does NOT show as "noname"
-        msg.get_payload()[0].add_related(
-            img_data,
-            maintype='image',
-            subtype='jpeg',
-            cid=f"<{image_cid}>",
-            filename='EmailBody.jpg',   # <--- This sets the filename
-            disposition='inline'        # <--- ensures it is inline
-        )
-    else:
-        msg.set_content(body_text or "Please see attachments.")
-
-    # Attach Redemption.jpg
+    # Redemption.jpg as normal attachment
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as f:
             msg.add_attachment(
-                f.read(), maintype='image', subtype='jpeg', filename='Redemption.jpg'
+                f.read(),
+                maintype='image',
+                subtype='jpeg',
+                filename='Redemption.jpg'
             )
 
-    # Attach card file
+    # Card or other attachment (normal)
     if attachment_path and os.path.exists(attachment_path):
-        try:
-            with open(attachment_path, 'rb') as f:
-                mime_type, _ = mimetypes.guess_type(attachment_path)
-                maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-                msg.add_attachment(
-                    f.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(attachment_path)
-                )
-        except Exception as e:
-            logging.error(f"Attach card failed: {e}")
+        with open(attachment_path, 'rb') as f:
+            mime_type, _ = mimetypes.guess_type(attachment_path)
+            maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
+            msg.add_attachment(
+                f.read(),
+                maintype=maintype,
+                subtype=subtype,
+                filename=os.path.basename(attachment_path)
+            )
 
     # Send email
     try:
@@ -138,10 +152,10 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             if smtp_password:
                 server.login(smtp_user, smtp_password)
             server.send_message(msg)
-        logging.info(f"✅ Email sent to {to_email}")
+        logging.info(f"Email sent to {to_email}")
     except Exception as e:
-        logging.error(f"❌ SMTP send failed: {e}")
-
+        logging.error(f"SMTP send failed: {e}")
+        
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
     font_policy_no = load_font(FONT_PATH, FONT_SIZE_POLICY_NO)
