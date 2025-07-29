@@ -71,7 +71,7 @@ def format_card_id(card_id):
     numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
     return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
 
-def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
+def send_email_with_inline(to_email, subject, body_text, attachment_path=None):
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
     smtp_user = os.environ.get('SMTP_USER')
@@ -82,65 +82,59 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['From'] = smtp_user
     msg['To'] = to_email
 
-    # Embed EmailBody.jpg inline using CID with filename
+    image_cid = make_msgid(domain='alife.com.mm')[1:-1]
+
+    html_body = f"""
+    <html>
+        <body>
+            <img src="cid:{image_cid}" style="max-width:100%;">
+            <p>{body_text}</p>
+        </body>
+    </html>
+    """
+    msg.set_content(body_text)
+    msg.add_alternative(html_body, subtype='html')
+
     email_body_path = os.path.join('static', 'EmailBody.jpg')
     if os.path.exists(email_body_path):
         with open(email_body_path, 'rb') as f:
-            img_data = f.read()
-        image_cid = make_msgid(domain='amember.local')[1:-1]  # remove < >
+            msg.get_payload()[1].add_related(
+                f.read(),
+                maintype='image',
+                subtype='jpeg',
+                cid=f"<{image_cid}>"
+            )
 
-        html_body = f"""
-        <html>
-        <body>
-            <img src="cid:{image_cid}" style="max-width:100%;">
-            <p>{body_text or ''}</p>
-        </body>
-        </html>
-        """
-        msg.add_alternative(html_body, subtype='html')
-
-        # Embed inline with filename so it does NOT show as "noname"
-        msg.get_payload()[0].add_related(
-            img_data,
-            maintype='image',
-            subtype='jpeg',
-            cid=f"<{image_cid}>",
-            filename='EmailBody.jpg',   # <--- This sets the filename
-            disposition='inline'        # <--- ensures it is inline
-        )
-    else:
-        msg.set_content(body_text or "Please see attachments.")
-
-    # Attach Redemption.jpg
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as f:
             msg.add_attachment(
-                f.read(), maintype='image', subtype='jpeg', filename='Redemption.jpg'
+                f.read(),
+                maintype='image',
+                subtype='jpeg',
+                filename='Redemption.jpg'
             )
 
-    # Attach card file
     if attachment_path and os.path.exists(attachment_path):
-        try:
-            with open(attachment_path, 'rb') as f:
-                mime_type, _ = mimetypes.guess_type(attachment_path)
-                maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-                msg.add_attachment(
-                    f.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(attachment_path)
-                )
-        except Exception as e:
-            logging.error(f"Attach card failed: {e}")
+        with open(attachment_path, 'rb') as f:
+            mime_type, _ = mimetypes.guess_type(attachment_path)
+            maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
+            msg.add_attachment(
+                f.read(),
+                maintype=maintype,
+                subtype=subtype,
+                filename=os.path.basename(attachment_path)
+            )
 
-    # Send email
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
             if smtp_password:
                 server.login(smtp_user, smtp_password)
             server.send_message(msg)
-        logging.info(f"✅ Email sent to {to_email}")
+        logging.info(f"Email sent to {to_email}")
     except Exception as e:
-        logging.error(f"❌ SMTP send failed: {e}")
+        logging.error(f"SMTP send failed: {e}")
 
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
