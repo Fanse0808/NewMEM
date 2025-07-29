@@ -9,8 +9,6 @@ import logging
 import smtplib
 import mimetypes
 import traceback
-from email.utils import make_msgid
-from email.mime.image import MIMEImage
 from email.message import EmailMessage
 
 from flask import Flask, render_template, request, redirect, flash, send_file, after_this_request
@@ -95,14 +93,13 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>
     </div>"""
 
-    # CID for inline EmailBody.jpg
-    image_cid = make_msgid(domain='alife.com.mm')[1:-1]
-
-    # Build HTML body with inline image and contact_info
+    # Reference EmailBody.jpg via GitHub URL
+    email_body_url = "https://raw.githubusercontent.com/Abraham461/EmailBody/main/EmailBody.jpg"
+    
     html_body = f"""
     <html>
         <body>
-            <img src="cid:{image_cid}" style="max-width:100%;"><br>
+            <img src=\"{email_body_url}\" style=\"max-width:100%;\"><br>
             <p>{body_text}</p>
             {contact_info}
         </body>
@@ -110,17 +107,6 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     """
     msg.set_content(body_text or "Please view this email in HTML format.")
     msg.add_alternative(html_body, subtype='html')
-
-    # Add EmailBody.jpg as inline (Content-Disposition: inline)
-    email_body_path = os.path.join('static', 'EmailBody.jpg')
-    if os.path.exists(email_body_path):
-        with open(email_body_path, 'rb') as f:
-            msg.get_payload()[1].add_related(
-                f.read(),
-                maintype='image',
-                subtype='jpeg',
-                cid=f"<{image_cid}>"
-            )
 
     # Redemption.jpg as normal attachment
     redemption_path = os.path.join('static', 'Redemption.jpg')
@@ -285,6 +271,11 @@ def api_create_card():
     if not card_file:
         return {"error": "Card image not generated"}, 500
     return send_file(card_file, as_attachment=True, download_name='card.png')
+
+@app.route('/static/Redemption.jpg')
+def serve_redemption():
+    """Serve Redemption.jpg for email inline images"""
+    return send_file('static/Redemption.jpg', mimetype='image/jpeg')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5003))
