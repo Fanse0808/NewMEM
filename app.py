@@ -81,7 +81,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     smtp_user = os.environ.get('SMTP_USER')
     smtp_password = os.environ.get('SMTP_PASSWORD')
 
-    # Root message
+    # Root message (mixed for attachments)
     msg_root = MIMEMultipart('mixed')
     msg_root['Subject'] = subject
     msg_root['From'] = smtp_user
@@ -91,40 +91,45 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg_related = MIMEMultipart('related')
     msg_root.attach(msg_related)
 
-    # Alternative part (plain text + HTML)
+    # Alternative part (text + HTML)
     msg_alternative = MIMEMultipart('alternative')
     msg_related.attach(msg_alternative)
 
-    # Plain text
+    # Text part
     msg_alternative.attach(MIMEText(body_text, 'plain'))
 
-    # HTML body with CID reference
+    # CID for inline image
     image_cid = make_msgid(domain='amember.local')[1:-1]
-    contact_info = """<div style='text-align:left;'><br>Warm Regards,<br>Customer Care & Complaints Management
-    <br>Operation Department<br><br>Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>
+
+    contact_info = """<div style='text-align:left;'><br>Warm Regards,<br>
+    Customer Care & Complaints Management<br>Operation Department<br><br>
+    Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>
     A Life Insurance Company Limited<br>3rd Floor (A), No. (108), Corner of<br>
     Kabaraye Pagoda Road and Nat Mauk Road,<br>
     Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>"""
 
     html_body = f"""
     <html><body>
-        <img src="cid:{image_cid}" style="max-width:100%;"><p>{body_text}</p>
+        <img src="cid:{image_cid}" style="max-width:100%;">
+        <p>{body_text}</p>
         {contact_info}
     </body></html>
     """
+
+    # HTML part
     msg_alternative.attach(MIMEText(html_body, 'html'))
 
-    # Embed memberinfo.jpg inline (no filename)
+    # Embed memberinfo.jpg inline (no filename!)
     try:
         with open(os.path.join('static', 'memberinfo.jpg'), 'rb') as img:
             img_mime = MIMEImage(img.read(), _subtype='jpeg')
             img_mime.add_header('Content-ID', f'<{image_cid}>')
-            img_mime.add_header('Content-Disposition', 'inline')  # no filename
+            img_mime.add_header('Content-Disposition', 'inline')  # No filename
             msg_related.attach(img_mime)
     except Exception as e:
-        logging.error(f"Embed image failed: {e}")
+        logging.error(f"Embed memberinfo.jpg failed: {e}")
 
-    # Attach Redemption.jpg
+    # Redemption.jpg attachment
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as img:
@@ -132,13 +137,11 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             att.add_header('Content-Disposition', 'attachment', filename='Redemption.jpg')
             msg_root.attach(att)
 
-    # Attach card
+    # Card attachment
     if attachment_path and os.path.exists(attachment_path):
         with open(attachment_path, 'rb') as f:
             mime_type, _ = mimetypes.guess_type(attachment_path)
             maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-            from email.mime.base import MIMEBase
-            from email import encoders
             att = MIMEBase(maintype, subtype)
             att.set_payload(f.read())
             encoders.encode_base64(att)
