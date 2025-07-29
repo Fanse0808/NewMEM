@@ -8,6 +8,7 @@ import time
 import logging
 import smtplib
 import mimetypes
+import base64
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
@@ -80,67 +81,56 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     smtp_user = os.environ.get('SMTP_USER')
     smtp_password = os.environ.get('SMTP_PASSWORD')
 
-    msg_root = MIMEMultipart('mixed')
-    msg_root['Subject'] = subject
-    msg_root['From'] = smtp_user
-    msg_root['To'] = to_email
+    msg = EmailMessage()
+    msg['Subject'] = subject
+    msg['From'] = smtp_user
+    msg['To'] = to_email
 
-    msg_related = MIMEMultipart('related')
-    msg_root.attach(msg_related)
+    try:
+        with open('static/memberinfo.jpg', 'rb') as img:
+            encoded = base64.b64encode(img.read()).decode('utf-8')
+    except Exception as e:
+        logging.error(f"Embed memberinfo.jpg failed: {e}")
+        encoded = ""  # fallback if missing
 
-    msg_alternative = MIMEMultipart('alternative')
-    msg_related.attach(msg_alternative)
-
-    msg_alternative.attach(MIMEText(body_text, 'plain'))
-
-    image_cid = make_msgid(domain='amember.local')[1:-1]
-    contact_info = """<div style='text-align:left;'><br>Warm Regards,<br>Customer Care & Complaints Management
-    <br>Operation Department<br><br>Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>
+    contact_info = """<div style='text-align:left;'><br>Warm Regards,<br>
+    Customer Care & Complaints Management<br>Operation Department<br><br>
+    Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>
     A Life Insurance Company Limited<br>3rd Floor (A), No. (108), Corner of<br>
     Kabaraye Pagoda Road and Nat Mauk Road,<br>
     Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>"""
 
     html_body = f"""
     <html><body>
-        <img src="cid:{image_cid}" style="max-width:100%;"><p>{body_text}</p>
+        <img src="data:image/jpeg;base64,{encoded}" style="max-width:100%;">
+        <p>{body_text}</p>
         {contact_info}
     </body></html>
     """
-    msg_alternative.attach(MIMEText(html_body, 'html'))
 
-    try:
-        with open(os.path.join('static', 'memberinfo.jpg'), 'rb') as img:
-            img_mime = MIMEImage(img.read(), _subtype='jpeg')
-            img_mime.add_header('Content-ID', f'<{image_cid}>')
-            img_mime.add_header('Content-Disposition', 'inline')  # no filename
-            msg_related.attach(img_mime)
-    except Exception as e:
-        logging.error(f"Embed image failed: {e}")
+    msg.set_content(body_text)
+    msg.add_alternative(html_body, subtype='html')
 
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as img:
-            att = MIMEImage(img.read(), _subtype='jpeg')
-            att.add_header('Content-Disposition', 'attachment', filename='Redemption.jpg')
-            msg_root.attach(att)
+            msg.add_attachment(img.read(), maintype='image', subtype='jpeg', filename='Redemption.jpg')
 
     if attachment_path and os.path.exists(attachment_path):
         with open(attachment_path, 'rb') as f:
             mime_type, _ = mimetypes.guess_type(attachment_path)
             maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-            from email.mime.base import MIMEBase
-            from email import encoders
-            att = MIMEBase(maintype, subtype)
-            att.set_payload(f.read())
-            encoders.encode_base64(att)
-            att.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
-            msg_root.attach(att)
+            msg.add_attachment(f.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(attachment_path))
 
-    with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
-        server.starttls()
-        if smtp_password:
-            server.login(smtp_user, smtp_password)
-        server.send_message(msg_root)
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
+            server.starttls()
+            if smtp_password:
+                server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+        logging.info(f"Email sent to {to_email}")
+    except Exception as e:
+        logging.error(f"SMTP send failed: {e}")
         
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
