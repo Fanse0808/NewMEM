@@ -99,25 +99,32 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
   msg.set_content(body_text)
     msg.add_alternative(html_body, subtype='html')
     
-    # Attach Redemption.jpg
-    redemption_path = os.path.join('static', 'Redemption.jpg')
+   redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as img:
             msg.add_attachment(img.read(), maintype='image', subtype='jpeg', filename='Redemption.jpg')
 
-    # Attach card file
+    # Attach additional file if given
     if attachment_path and os.path.exists(attachment_path):
         with open(attachment_path, 'rb') as f:
             mime_type, _ = mimetypes.guess_type(attachment_path)
             maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-            msg.add_attachment(f.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(attachment_path))
+            attachment = MIMEBase(maintype, subtype)
+            attachment.set_payload(f.read())
+            encoders.encode_base64(attachment)
+            attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
+            msg.attach(attachment)
 
-    # Send
-    with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
-        server.starttls()
-        if smtp_password:
-            server.login(smtp_user, smtp_password)
-        server.send_message(msg)
+    # Send the email
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
+            server.starttls()
+            if smtp_password:
+                server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+        logging.info(f"Email sent to {to_email}")
+    except Exception as e:
+        logging.error(f"SMTP send failed: {e}")
         
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
