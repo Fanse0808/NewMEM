@@ -89,7 +89,8 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
 
     msg_alternative = MIMEMultipart('alternative')
     msg.attach(msg_alternative)
-
+    
+    # Plain text part
     text_part = MIMEText(body_text, 'plain')
     msg_alternative.attach(text_part)
 
@@ -101,9 +102,9 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                 memberinfo_base64 = base64.b64encode(img.read()).decode('utf-8')
     except Exception as e:
         logging.error(f"Error processing memberinfo.jpg: {e}")
-
+  
     contact_info = '''<div style="text-align:left;"><br>Warm Regards,<br>Customer Care & Complaints Management<br>Operation Department<br><br>Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>A Life Insurance Company Limited<br>3rd Floor (A), No. (108), Corner of<br>Kabaraye Pagoda Road and Nat Mauk Road,<br>Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>'''
-
+    
     html_content = f"""
     <html>
         <body>
