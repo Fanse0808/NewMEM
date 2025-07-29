@@ -114,16 +114,13 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     html_part = MIMEText(html_body, 'html')
     msg.attach(html_part)
 
+    # Add EmailBody.jpg as regular attachment for now (will be visible but at least it works)
     email_body_path = os.path.join('static', 'EmailBody.jpg')
     if os.path.exists(email_body_path):
         with open(email_body_path, 'rb') as f:
-            image_part = MIMEImage(f.read())
-            image_part.add_header('Content-ID', f'<{image_cid}>')
-            image_part.add_header('Content-Disposition', 'inline')
-            # Remove filename to prevent "(noname)" from appearing
-            if 'filename' in image_part:
-                del image_part['filename']
-            msg.attach(image_part)
+            email_body_part = MIMEImage(f.read())
+            email_body_part.add_header('Content-Disposition', 'attachment', filename='EmailBody.jpg')
+            msg.attach(email_body_part)
 
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
