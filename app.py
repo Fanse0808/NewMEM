@@ -66,14 +66,27 @@ def format_card_id(card_id):
     numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
     return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
 
+import os
+import smtplib
+import logging
+import base64
+import mimetypes
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+from email.mime.base import MIMEBase
+from email import encoders
+
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
+    # SMTP configuration
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
     smtp_user = os.environ.get('SMTP_USER')
     smtp_password = os.environ.get('SMTP_PASSWORD')
     from_email = smtp_user
+    
     if not all([smtp_server, smtp_port, smtp_user]):
-        logging.error("SMTP config missing")
+        logging.error("SMTP configuration is incomplete")
         return
 
     msg = MIMEMultipart('mixed')
@@ -84,40 +97,34 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg_alternative = MIMEMultipart('alternative')
     msg.attach(msg_alternative)
     
+    # Plain text part
     text_part = MIMEText(body_text, 'plain')
     msg_alternative.attach(text_part)
-    
-    msg_related = MIMEMultipart('related')
-    msg_alternative.attach(msg_related)
-    
-    image_cid = make_msgid(domain='amember.local')[1:-1]
-    
+
+    memberinfo_base64 = ""
+    try:
+        memberinfo_path = os.path.join('static', 'memberinfo.jpg')
+        if os.path.exists(memberinfo_path):
+            with open(memberinfo_path, 'rb') as img:
+                memberinfo_base64 = base64.b64encode(img.read()).decode('utf-8')
+    except Exception as e:
+        logging.error(f"Error processing memberinfo.jpg: {e}")
+
     contact_info = '''<div style="text-align:left;"><br>Warm Regards,<br>Customer Care & Complaints Management<br>Operation Department<br><br>Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>A Life Insurance Company Limited<br>3rd Floor (A), No. (108), Corner of<br>Kabaraye Pagoda Road and Nat Mauk Road,<br>Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>'''
-    
+
     html_content = f"""
     <html>
         <body>
-            <img src="cid:{image_cid}" style="max-width:100%;">
+            <img src="data:image/jpeg;base64,{memberinfo_base64}" style="max-width:100%;">
             <p>{body_text}</p>
             {contact_info}
         </body>
     </html>
     """
-    
+
     html_part = MIMEText(html_content, 'html')
-    msg_related.attach(html_part)
+    msg_alternative.attach(html_part)
     
-    try:
-        memberinfo_path = os.path.join('static', 'memberinfo.jpg')
-        if os.path.exists(memberinfo_path):
-            with open(memberinfo_path, 'rb') as img:
-                img_part = MIMEImage(img.read(), 'jpeg')
-                img_part.add_header('Content-ID', f'<{image_cid}>')
-                # NO Content-Disposition header for embedded images
-                msg_related.attach(img_part)
-    except Exception as e:
-        logging.error(f"Embed memberinfo.jpg failed: {e}")
-        
     try:
         redemption_path = os.path.join('static', 'Redemption.jpg')
         if os.path.exists(redemption_path):
@@ -130,8 +137,9 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                 )
                 msg.attach(redemption_part)
     except Exception as e:
-        logging.error(f"Attach Redemption.jpg failed: {e}")
+        logging.error(f"Error attaching Redemption.jpg: {e}")
     
+    # Attach custom attachment if provided
     if attachment_path and os.path.exists(attachment_path):
         try:
             with open(attachment_path, 'rb') as f:
@@ -151,7 +159,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                 )
                 msg.attach(attachment_part)
         except Exception as e:
-            logging.error(f"Attach card failed: {e}")
+            logging.error(f"Error attaching custom file: {e}")
 
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
@@ -159,7 +167,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             if smtp_password:
                 server.login(smtp_user, smtp_password)
             server.send_message(msg)
-        logging.info(f"Email sent to {to_email}")
+        logging.info(f"Email successfully sent to {to_email}")
     except Exception as e:
         logging.error(f"SMTP send failed: {e}")
 
