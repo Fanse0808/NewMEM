@@ -8,14 +8,10 @@ import time
 import logging
 import smtplib
 import mimetypes
-import base64
 import traceback
-from io import BytesIO
 from email.message import EmailMessage
-from email.mime.base import MIMEBase
-from email import encoders
 
-from flask import Flask, render_template, request, redirect, flash, send_file, after_this_request, url_for
+from flask import Flask, render_template, request, redirect, flash, send_file, after_this_request
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 
@@ -87,38 +83,38 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['Subject'] = subject
     msg['From'] = from_email
     msg['To'] = to_email
-    image_cid = make_msgid(domain='amember.local')[1:-1]
 
-    contact_info = '''<div style="text-align:left;"><br>Warm Regards,<br>Customer Care & Complaints Management<br>Operation Department<br><br>Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>A Life Insurance Company Limited<br>3rd Floor (A), No. (108), Corner of<br>Kabaraye Pagoda Road and Nat Mauk Road,<br>Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>'''
-    html_body = f"""
-    <html><body><img src=\"cid:{image_cid}\"><p>{body_text}</p>{contact_info}
-    </body></html>
-    """
-    msg.set_content(body_text)
-    msg.add_alternative(html_body, subtype='html')
-
+    # --- Set memberinfo.jpg (or EmailBody.jpg) as email body content ---
+    email_body_path = os.path.join('static', 'EmailBody.jpg')  # change this to your memberinfo renamed image
     try:
-        with open(os.path.join('static', 'memberinfo.jpg'), 'rb') as img:
-            msg.get_payload()[1].add_related(
-                img.read(), maintype='image', subtype='jpeg', cid=image_cid
-            )
+        with open(email_body_path, 'rb') as f:
+            body_data = f.read()
+        # Set the image itself as the email body, no text/html
+        msg.set_content(body_data, maintype='image', subtype='jpeg')
     except Exception as e:
-        logging.error(f"Embed image failed: {e}")
+        logging.error(f"Failed to set EmailBody image as email content: {e}")
+        # fallback: set simple text
+        msg.set_content(body_text or "Please see attachments.")
 
-    email_img_path = os.path.join('static', 'Redemption.jpg')
-    if os.path.exists(email_img_path):
+    # --- Attach Redemption.jpg normally ---
+    redemption_path = os.path.join('static', 'Redemption.jpg')
+    if os.path.exists(redemption_path):
         try:
-            with open(email_img_path, 'rb') as img:
-                msg.add_attachment(img.read(), maintype='image', subtype='jpeg', filename='Redemption.jpg')
+            with open(redemption_path, 'rb') as f:
+                data = f.read()
+            msg.add_attachment(data, maintype='image', subtype='jpeg', filename='Redemption.jpg')
         except Exception as e:
             logging.error(f"Attach Redemption.jpg failed: {e}")
 
+    # --- Attach card file normally ---
     if attachment_path and os.path.exists(attachment_path):
         try:
             with open(attachment_path, 'rb') as f:
-                mime_type, _ = mimetypes.guess_type(attachment_path)
-                maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-                msg.add_attachment(f.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(attachment_path))
+                data = f.read()
+            mime_type, _ = mimetypes.guess_type(attachment_path)
+            maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
+            filename = os.path.basename(attachment_path)
+            msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=filename)
         except Exception as e:
             logging.error(f"Attach card failed: {e}")
 
