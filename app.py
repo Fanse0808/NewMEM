@@ -100,6 +100,22 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>
     </div>"""
 
+    # Embed EmailBody.jpg as base64 directly in HTML (truly invisible)
+    email_body_path = os.path.join('static', 'EmailBody.jpg')
+    image_data = ""
+    if os.path.exists(email_body_path):
+        with open(email_body_path, 'rb') as f:
+            image_data = base64.b64encode(f.read()).decode('utf-8')
+    
+    # Create HTML body with embedded base64 image
+    html_body = f"""<html>
+        <body style="margin:0; padding:0;">
+            <img src="data:image/jpeg;base64,{image_data}" style="width:100%; display:block;" alt="Email Header"><br>
+            <p>{body_text}</p>
+            {contact_info}
+        </body>
+    </html>"""
+
     # Create alternative part for text/HTML
     alternative_part = MIMEMultipart('alternative')
     msg.attach(alternative_part)
@@ -108,33 +124,9 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     text_part = MIMEText(body_text or "Please view this email in HTML format.", 'plain')
     alternative_part.attach(text_part)
 
-    # Create related part for HTML + inline images
-    related_part = MIMEMultipart('related')
-    alternative_part.attach(related_part)
-
-    # HTML body with CID reference
-    image_cid = "email_body_image"
-    html_body = f"""<html>
-        <body style="margin:0; padding:0;">
-            <img src="cid:{image_cid}" style="width:100%; display:block;" alt="Email Header"><br>
-            <p>{body_text}</p>
-            {contact_info}
-        </body>
-    </html>"""
-    
-    # Add HTML to related part
+    # Add HTML part directly (no related part needed for base64)
     html_part = MIMEText(html_body, 'html')
-    related_part.attach(html_part)
-
-    # Add inline image WITHOUT FILENAME in headers
-    email_body_path = os.path.join('static', 'EmailBody.jpg')
-    if os.path.exists(email_body_path):
-        with open(email_body_path, 'rb') as f:
-            img = MIMEImage(f.read())
-            img.add_header('Content-ID', f'<{image_cid}>')
-            # Critical fix: Remove filename to make it invisible
-            img.add_header('Content-Disposition', 'inline')
-            related_part.attach(img)
+    alternative_part.attach(html_part)
 
     # Add regular attachments
     # 1. Redemption image (as regular attachment)
