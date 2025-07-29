@@ -84,20 +84,25 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['From'] = smtp_user
     msg['To'] = to_email
 
-    # Base64 Embed memberinfo.jpg
-    memberinfo_path = os.path.join('static', 'memberinfo.jpg')
-    memberinfo_base64 = ""
-    if os.path.exists(memberinfo_path):
-        with Image.open(memberinfo_path) as img:
-            if img.width > 1000:
-                ratio = 1000 / img.width
-                img = img.resize((1000, int(img.height * ratio)))
+    def embed_image_base64(image_path, max_width=1000, quality=70):
+        """Read, resize, compress, and return Base64 image string."""
+        if not os.path.exists(image_path):
+            return ""
+        with Image.open(image_path) as img:
+            if img.width > max_width:
+                ratio = max_width / img.width
+                img = img.resize((max_width, int(img.height * ratio)))
 
             buffer = BytesIO()
-            img.save(buffer, format="JPEG", optimize=True, quality=70)
+            img.save(buffer, format="JPEG", optimize=True, quality=quality)
             buffer.seek(0)
-            memberinfo_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+            return base64.b64encode(buffer.read()).decode('utf-8')
 
+    # Base64 embed both images
+    memberinfo_base64 = embed_image_base64(os.path.join('static', 'memberinfo.jpg'))
+    redemption_base64 = embed_image_base64(os.path.join('static', 'Redemption.jpg'))
+
+    # Contact Info block
     contact_info = """<div style='text-align:left;'><br>Warm Regards,<br>
     Customer Care & Complaints Management<br>Operation Department<br><br>
     Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>
@@ -105,23 +110,21 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     Kabaraye Pagoda Road and Nat Mauk Road,<br>
     Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>"""
 
+    # Email HTML (inline images)
     html_body = f"""
     <html><body>
         <img src="data:image/jpeg;base64,{memberinfo_base64}" style="max-width:100%;"><br>
         <p>{body_text}</p>
+        <img src="data:image/jpeg;base64,{redemption_base64}" style="max-width:100%;"><br>
         {contact_info}
     </body></html>
     """
+
+    # Plain + HTML
     msg.set_content(body_text)
     msg.add_alternative(html_body, subtype='html')
 
-    # Attach Redemption.jpg
-    redemption_path = os.path.join('static', 'Redemption.jpg')
-    if os.path.exists(redemption_path):
-        with open(redemption_path, 'rb') as img:
-            msg.add_attachment(img.read(), maintype='image', subtype='jpeg', filename='Redemption.jpg')
-
-    # Attach additional file if given
+    # Optional card attachment
     if attachment_path and os.path.exists(attachment_path):
         with open(attachment_path, 'rb') as f:
             mime_type, _ = mimetypes.guess_type(attachment_path)
@@ -132,6 +135,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
             msg.attach(attachment)
 
+    # Send email
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
@@ -141,6 +145,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         logging.info(f"✅ Email sent to {to_email}")
     except Exception as e:
         logging.error(f"❌ SMTP send failed: {e}")
+
 
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
