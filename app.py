@@ -84,25 +84,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['From'] = smtp_user
     msg['To'] = to_email
 
-    def embed_image_base64(image_path, max_width=1000, quality=70):
-        """Read, resize, compress, and return Base64 image string."""
-        if not os.path.exists(image_path):
-            return ""
-        with Image.open(image_path) as img:
-            if img.width > max_width:
-                ratio = max_width / img.width
-                img = img.resize((max_width, int(img.height * ratio)))
-
-            buffer = BytesIO()
-            img.save(buffer, format="JPEG", optimize=True, quality=quality)
-            buffer.seek(0)
-            return base64.b64encode(buffer.read()).decode('utf-8')
-
-    # Base64 embed images inline in email body
-    memberinfo_base64 = embed_image_base64(os.path.join('static', 'memberinfo.jpg'))
-    redemption_base64 = embed_image_base64(os.path.join('static', 'Redemption.jpg'))
-
-    # Contact info block
+    # Contact Info block - NO memberinfo.jpg inline!
     contact_info = """<div style='text-align:left;'><br>Warm Regards,<br>
     Customer Care & Complaints Management<br>Operation Department<br><br>
     Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>
@@ -110,21 +92,31 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     Kabaraye Pagoda Road and Nat Mauk Road,<br>
     Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>"""
 
-    # Compose HTML email body with inline images (no attachments for these)
     html_body = f"""
     <html><body>
-        <img src="data:image/jpeg;base64,{memberinfo_base64}" style="max-width:100%;"><br>
         <p>{body_text}</p>
-        <img src="data:image/jpeg;base64,{redemption_base64}" style="max-width:100%;"><br>
         {contact_info}
     </body></html>
     """
 
-    # Plain text + HTML alternative
     msg.set_content(body_text)
     msg.add_alternative(html_body, subtype='html')
 
-    # Attach the card image if provided
+    # Attach memberinfo.jpg as attachment (NOT inline)
+    memberinfo_path = os.path.join('static', 'memberinfo.jpg')
+    if os.path.exists(memberinfo_path):
+        with open(memberinfo_path, 'rb') as f:
+            mime_type, _ = mimetypes.guess_type(memberinfo_path)
+            maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
+            memberinfo_attachment = MIMEBase(maintype, subtype)
+            memberinfo_attachment.set_payload(f.read())
+            encoders.encode_base64(memberinfo_attachment)
+            memberinfo_attachment.add_header('Content-Disposition', 'attachment', filename='memberinfo.jpg')
+            msg.attach(memberinfo_attachment)
+
+    # Optionally attach Redemption.jpg inline or as attachment, or remove it if not needed
+
+    # Attach card image file if provided
     if attachment_path and os.path.exists(attachment_path):
         with open(attachment_path, 'rb') as f:
             mime_type, _ = mimetypes.guess_type(attachment_path)
@@ -135,7 +127,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
             msg.attach(attachment)
 
-    # Send email via SMTP
+    # Send email as usual
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
