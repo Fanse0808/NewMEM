@@ -8,9 +8,6 @@ import time
 import logging
 import smtplib
 import mimetypes
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
 from email.mime.base import MIMEBase
 from email import encoders
 from email.message import EmailMessage
@@ -82,7 +79,6 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['From'] = smtp_user
     msg['To'] = to_email
 
-    # Build the full URL for memberinfo.jpg
     memberinfo_url = url_for('static', filename='memberinfo.jpg', _external=True)
     
     contact_info = """<div style='text-align:left;'><br>Warm Regards,<br>
@@ -94,7 +90,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
 
     html_body = f"""
     <html><body>
-        <img src="cid:{memberinfo_url}" style="max-width:100%;">
+        <img src="{memberinfo_url}" style="max-width:100%;">
         <p>{body_text}</p>
         {contact_info}
     </body></html>
@@ -102,7 +98,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
 
   msg.set_content(body_text)
     msg.add_alternative(html_body, subtype='html')
-
+    
     # Attach Redemption.jpg
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
