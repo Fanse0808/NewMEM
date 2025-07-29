@@ -93,13 +93,13 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>
     </div>"""
 
-    # Reference EmailBody.jpg via GitHub URL
-    email_body_url = "https://github.com/Fanse0808/NewMEM/blob/main/static/EmailBody.jpg"
+    # Reference EmailBody.jpg via ImgBB URL
+    email_body_url = "https://i.ibb.co/bMxxc1bQ/Email-Body.jpg"
     
     html_body = f"""
     <html>
         <body>
-            <img src="https://raw.githubusercontent.com/user/repo/main/static/EmailBody.jpg" style="max-width:100%;">
+            <img src="{email_body_url}" style="max-width:100%;" alt="Email Body Image"><br>
             <p>{body_text}</p>
             {contact_info}
         </body>
