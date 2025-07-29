@@ -9,6 +9,7 @@ import logging
 import smtplib
 import mimetypes
 import traceback
+import base64
 from email.message import EmailMessage
 
 from flask import Flask, render_template, request, redirect, flash, send_file, after_this_request
@@ -97,7 +98,6 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     email_body_path = os.path.join('static', 'EmailBody_compressed.jpg')
     image_data = ""
     if os.path.exists(email_body_path):
-        import base64
         with open(email_body_path, 'rb') as f:
             image_data = base64.b64encode(f.read()).decode('utf-8')
     
