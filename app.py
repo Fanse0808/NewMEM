@@ -81,7 +81,6 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['From'] = smtp_user
     msg['To'] = to_email
 
-    # Contact info (added at bottom of email)
     contact_info = """<div style='text-align:left;'><br>
         Warm Regards,<br>
         Customer Care & Complaints Management<br>
@@ -94,17 +93,13 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>
     </div>"""
 
-    # Embed EmailBody.jpg as base64 directly in HTML (invisible in previews, displays inline)
     email_body_path = os.path.join('static', 'EmailBody_compressed.jpg')
-    image_data = ""
-    if os.path.exists(email_body_path):
-        with open(email_body_path, 'rb') as f:
-            image_data = base64.b64encode(f.read()).decode('utf-8')
+    image_cid = "email_body_image"
     
     html_body = f"""
     <html>
         <body>
-            <img src="data:image/jpeg;base64,{image_data}" style="max-width:100%;" alt="Email Body Image"><br>
+            <img src="cid:{image_cid}" style="max-width:100%;" alt="Email Body Image"><br>
             <p>{body_text}</p>
             {contact_info}
         </body>
@@ -113,7 +108,18 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg.set_content(body_text or "Please view this email in HTML format.")
     msg.add_alternative(html_body, subtype='html')
 
-    # Redemption.jpg as normal attachment
+    if os.path.exists(email_body_path):
+        with open(email_body_path, 'rb') as f:
+            inline_part = msg.get_payload()[1].add_related(
+                f.read(),
+                maintype='image',
+                subtype='jpeg',
+                cid=f"<{image_cid}>"
+            )
+            inline_part['Content-Disposition'] = 'inline'
+            if 'filename' in inline_part:
+                del inline_part['filename']
+
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as f:
@@ -124,7 +130,6 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                 filename='Redemption.jpg'
             )
 
-    # Card or other attachment (normal)
     if attachment_path and os.path.exists(attachment_path):
         with open(attachment_path, 'rb') as f:
             mime_type, _ = mimetypes.guess_type(attachment_path)
@@ -136,7 +141,6 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                 filename=os.path.basename(attachment_path)
             )
 
-    # Send email
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
