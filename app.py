@@ -110,15 +110,17 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
 
     if os.path.exists(email_body_path):
         with open(email_body_path, 'rb') as f:
-            inline_part = msg.get_payload()[1].add_related(
-                f.read(),
-                maintype='image',
-                subtype='jpeg',
-                cid=f"<{image_cid}>"
-            )
-            inline_part['Content-Disposition'] = 'inline'
-            if 'filename' in inline_part:
-                del inline_part['filename']
+            if os.path.exists(email_body_path):
+    with open(email_body_path, 'rb') as f:
+        for part in msg.iter_parts():
+            if part.get_content_type() == 'text/html':
+                part.add_related(
+                    f.read(),
+                    maintype='image',
+                    subtype='jpeg',
+                    cid=f"<{image_cid}>"
+                )
+                break
 
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
