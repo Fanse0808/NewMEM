@@ -74,6 +74,7 @@ import os, smtplib, mimetypes, logging
 from email.message import EmailMessage
 from email.utils import make_msgid
 
+
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
@@ -102,7 +103,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     Kabaraye Pagoda Road and Nat Mauk Road,<br>
     Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>"""
 
-    html_body = f"""
+   html_body = f"""
     <html><body>
         <img src="cid:{image_cid}" style="max-width:100%;">
         <p>{body_text}</p>
@@ -110,9 +111,9 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     </body></html>
     """
 
- msg_alternative.attach(MIMEText(html_body, 'html'))
+  msg_alternative.attach(MIMEText(html_body, 'html'))
 
-    # Inline image memberinfo.jpg
+    # Attach memberinfo.jpg inline
     try:
         with open(os.path.join('static', 'memberinfo.jpg'), 'rb') as img_file:
             img = MIMEImage(img_file.read(), _subtype='jpeg')
@@ -133,10 +134,9 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         except Exception as e:
             logging.error(f"Failed to attach Redemption.jpg: {e}")
 
-    # Attach card only if it's an image (no MIMEBase)
+    # Attach card file ONLY if it is an image
     if attachment_path and os.path.exists(attachment_path):
         try:
-            # Check if it's an image by mime type
             mime_type, _ = mimetypes.guess_type(attachment_path)
             if mime_type and mime_type.startswith('image/'):
                 with open(attachment_path, 'rb') as f:
@@ -144,7 +144,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                     card_img.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
                     msg_root.attach(card_img)
             else:
-                logging.warning("Attachment is not an image; skipping attachment to avoid MIMEBase.")
+                logging.warning(f"Attachment {attachment_path} is not an image. Skipping to avoid MIMEBase usage.")
         except Exception as e:
             logging.error(f"Failed to attach card file: {e}")
 
