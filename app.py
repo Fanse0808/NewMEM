@@ -76,76 +76,63 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
     smtp_user = os.environ.get('SMTP_USER')
     smtp_password = os.environ.get('SMTP_PASSWORD')
-    from_email = smtp_user
-
-    if not all([smtp_server, smtp_port, smtp_user]):
-        logging.error("SMTP config missing")
-        return
 
     msg = EmailMessage()
     msg['Subject'] = subject
-    msg['From'] = from_email
+    msg['From'] = smtp_user
     msg['To'] = to_email
 
+    # Embed EmailBody.jpg inline using CID
     email_body_path = os.path.join('static', 'EmailBody.jpg')
-    email_body_cid = make_msgid(domain="alife.com.mm")[1:-1]  # unique CID
-    html_body = f"""
-    <html><body>
-        <img src="cid:{email_body_cid}" alt="EmailBody" style="max-width:100%;">
-        <p>{body_text}</p>
-    </body></html>
-    """
-    msg.set_content(body_text or "Please see attachments.")
-    msg.add_alternative(html_body, subtype='html')
-
-    try:
+    if os.path.exists(email_body_path):
         with open(email_body_path, 'rb') as f:
             img_data = f.read()
-            # Embed image with correct filename and unique CID
-            msg.get_payload()[1].add_related(
-                img_data,
-                maintype='image',
-                subtype='jpeg',
-                cid=email_body_cid,
-                filename='EmailBody.jpg'
-            )
-    except Exception as e:
-        logging.error(f"Failed to embed EmailBody.jpg: {e}")
+        image_cid = make_msgid(domain='amember.local')[1:-1]  # remove < >
+        
+        html_body = f"""
+        <html>
+        <body>
+            <img src="cid:{image_cid}" style="max-width:100%;">
+            <p>{body_text or ''}</p>
+        </body>
+        </html>
+        """
+        msg.add_alternative(html_body, subtype='html')
+        # Attach as inline (not as attachment)
+        msg.get_payload()[0].add_related(img_data, maintype='image', subtype='jpeg', cid=f"<{image_cid}>")
+    else:
+        msg.set_content(body_text or "Please see attachments.")
 
+    # Attach Redemption.jpg normally
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
-        try:
-            with open(redemption_path, 'rb') as f:
-                msg.add_attachment(f.read(), 
-                                   maintype='image', 
-                                   subtype='jpeg', 
-                                   filename='Redemption.jpg')
-        except Exception as e:
-            logging.error(f"Attach Redemption.jpg failed: {e}")
+        with open(redemption_path, 'rb') as f:
+            msg.add_attachment(
+                f.read(), maintype='image', subtype='jpeg', filename='Redemption.jpg'
+            )
 
+    # Attach card file normally
     if attachment_path and os.path.exists(attachment_path):
         try:
             with open(attachment_path, 'rb') as f:
-                data = f.read()
-            mime_type, _ = mimetypes.guess_type(attachment_path)
-            maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-            filename = os.path.basename(attachment_path)
-            msg.add_attachment(data, 
-                               maintype=maintype, 
-                               subtype=subtype, 
-                               filename=filename)
+                mime_type, _ = mimetypes.guess_type(attachment_path)
+                maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
+                msg.add_attachment(
+                    f.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(attachment_path)
+                )
         except Exception as e:
             logging.error(f"Attach card failed: {e}")
 
+    # Send email with debug logging
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
             if smtp_password:
                 server.login(smtp_user, smtp_password)
             server.send_message(msg)
-        logging.info(f"Email sent to {to_email}")
+        logging.info(f"✅ Email sent to {to_email}")
     except Exception as e:
-        logging.error(f"SMTP send failed: {e}")
+        logging.error(f"❌ SMTP send failed: {e}")
 
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
