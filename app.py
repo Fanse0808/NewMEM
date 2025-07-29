@@ -82,13 +82,13 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['From'] = smtp_user
     msg['To'] = to_email
 
-    # Embed EmailBody.jpg inline using CID
+    # Embed EmailBody.jpg inline using CID with filename
     email_body_path = os.path.join('static', 'EmailBody.jpg')
     if os.path.exists(email_body_path):
         with open(email_body_path, 'rb') as f:
             img_data = f.read()
         image_cid = make_msgid(domain='amember.local')[1:-1]  # remove < >
-        
+
         html_body = f"""
         <html>
         <body>
@@ -98,12 +98,20 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         </html>
         """
         msg.add_alternative(html_body, subtype='html')
-        # Attach as inline (not as attachment)
-        msg.get_payload()[0].add_related(img_data, maintype='image', subtype='jpeg', cid=f"<{image_cid}>")
+
+        # Embed inline with filename so it does NOT show as "noname"
+        msg.get_payload()[0].add_related(
+            img_data,
+            maintype='image',
+            subtype='jpeg',
+            cid=f"<{image_cid}>",
+            filename='EmailBody.jpg',   # <--- This sets the filename
+            disposition='inline'        # <--- ensures it is inline
+        )
     else:
         msg.set_content(body_text or "Please see attachments.")
 
-    # Attach Redemption.jpg normally
+    # Attach Redemption.jpg
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as f:
@@ -111,7 +119,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                 f.read(), maintype='image', subtype='jpeg', filename='Redemption.jpg'
             )
 
-    # Attach card file normally
+    # Attach card file
     if attachment_path and os.path.exists(attachment_path):
         try:
             with open(attachment_path, 'rb') as f:
@@ -123,7 +131,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         except Exception as e:
             logging.error(f"Attach card failed: {e}")
 
-    # Send email with debug logging
+    # Send email
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
