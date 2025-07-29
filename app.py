@@ -114,17 +114,17 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
 
  msg_alternative.attach(MIMEText(html_body, 'html'))
 
-    # Attach memberinfo.jpg inline (no filename!)
+    # Inline image memberinfo.jpg
     try:
         with open(os.path.join('static', 'memberinfo.jpg'), 'rb') as img_file:
             img = MIMEImage(img_file.read(), _subtype='jpeg')
             img.add_header('Content-ID', f'<{image_cid}>')
-            img.add_header('Content-Disposition', 'inline')  # no filename here
+            img.add_header('Content-Disposition', 'inline')
             msg_related.attach(img)
     except Exception as e:
         logging.error(f"Failed to attach inline memberinfo.jpg: {e}")
 
-    # Attach Redemption.jpg as regular attachment
+    # Attach Redemption.jpg as attachment
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         try:
@@ -135,21 +135,21 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         except Exception as e:
             logging.error(f"Failed to attach Redemption.jpg: {e}")
 
-    # Attach optional card file if provided
+    # Attach card only if it's an image (no MIMEBase)
     if attachment_path and os.path.exists(attachment_path):
         try:
-            with open(attachment_path, 'rb') as f:
-                mime_type, _ = mimetypes.guess_type(attachment_path)
-                maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-                attachment = MIMEBase(maintype, subtype)
-                attachment.set_payload(f.read())
-                encoders.encode_base64(attachment)
-                attachment.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
-                msg_root.attach(attachment)
+            # Check if it's an image by mime type
+            mime_type, _ = mimetypes.guess_type(attachment_path)
+            if mime_type and mime_type.startswith('image/'):
+                with open(attachment_path, 'rb') as f:
+                    card_img = MIMEImage(f.read(), _subtype=mime_type.split('/')[1])
+                    card_img.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
+                    msg_root.attach(card_img)
+            else:
+                logging.warning("Attachment is not an image; skipping attachment to avoid MIMEBase.")
         except Exception as e:
             logging.error(f"Failed to attach card file: {e}")
 
-    # Send the email
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
