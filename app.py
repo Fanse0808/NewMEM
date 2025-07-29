@@ -105,12 +105,12 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     """
 
     msg.set_content(body_text or "Please view this email in HTML format.")
-    msg.add_alternative(html_body, subtype='html')
+    html_part = msg.add_alternative(html_body, subtype='html')
 
     email_body_path = os.path.join('static', 'EmailBody.jpg')
     if os.path.exists(email_body_path):
         with open(email_body_path, 'rb') as f:
-            inline_part = msg.get_payload()[1].add_related(
+            inline_part = html_part.add_related(
                 f.read(),
                 maintype='image',
                 subtype='jpeg',
