@@ -8,18 +8,23 @@ import time
 import logging
 import smtplib
 import mimetypes
-from email.message import EmailMessage
-from email.utils import make_msgid
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file
+import traceback
+import base64
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+
+from flask import Flask, render_template, request, redirect, flash, send_file, after_this_request
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 
 # Logging
 logging.basicConfig(level=logging.INFO)
 
-# App Setup
+# Flask Setup
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'supersecretkey')
+
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'web_cards'
 SAMPLE_CSV_PATH = 'static/sample_cards.csv'
@@ -41,12 +46,13 @@ FONT_SIZE_LABEL = 18
 for folder in (UPLOAD_FOLDER, OUTPUT_FOLDER, 'static'):
     os.makedirs(folder, exist_ok=True)
 
-# Create sample CSV
+# Create sample CSV if not exists
 if not os.path.exists(SAMPLE_CSV_PATH):
     with open(SAMPLE_CSV_PATH, 'w') as f:
-        f.write("Name,Card,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\nJane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com")
+        f.write("Name,Card,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\n"
+                "Jane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com")
 
-# --- Utility Functions ---
+# ---- Utility Functions ----
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xlsx', 'csv'}
 
@@ -71,49 +77,74 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
     smtp_user = os.environ.get('SMTP_USER')
     smtp_password = os.environ.get('SMTP_PASSWORD')
-    from_email = smtp_user
-    if not all([smtp_server, smtp_port, smtp_user]):
-        logging.error("SMTP config missing")
-        return
 
-    msg = EmailMessage()
+    msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
-    msg['From'] = from_email
+    msg['From'] = smtp_user
     msg['To'] = to_email
-    image_cid = make_msgid(domain='amember.local')[1:-1]
 
-    contact_info = '''<div style="text-align:left;"><br>Warm Regards,<br>Customer Care & Complaints Management<br>Operation Department<br><br>Phone: +95 9791232222<br>Email: customercare@alife.com.mm<br><br>A Life Insurance Company Limited<br>3rd Floor (A), No. (108), Corner of<br>Kabaraye Pagoda Road and Nat Mauk Road,<br>Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br></div>'''
+    contact_info = """<div style='text-align:left;'><br>
+        Warm Regards,<br>
+        Customer Care & Complaints Management<br>
+        Operation Department<br><br>
+        Phone: +95 9791232222<br>
+        Email: customercare@alife.com.mm<br><br>
+        A Life Insurance Company Limited<br>
+        3rd Floor (A), No. (108), Corner of<br>
+        Kabaraye Pagoda Road and Nat Mauk Road,<br>
+        Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>
+    </div>"""
+
+    image_cid = "email_body_image"
     html_body = f"""
-    <html><body><img src=\"cid:{image_cid}\"><p>{body_text}</p>{contact_info}
-    </body></html>
+    <html>
+        <body style="margin:0; padding:0;">
+            <img src="cid:{image_cid}" style="width:100%; display:block;" alt="Email Body Image"><br>
+            <p>{body_text}</p>
+            {contact_info}
+        </body>
+    </html>
     """
-    msg.set_content(body_text)
-    msg.add_alternative(html_body, subtype='html')
 
-    try:
-        with open(os.path.join('static', 'memberinfo.jpg'), 'rb') as img:
-            msg.get_payload()[1].add_related(
-                img.read(), maintype='image', subtype='jpeg', cid=image_cid
-            )
-    except Exception as e:
-        logging.error(f"Embed image failed: {e}")
+    # Add text part
+    text_part = MIMEText(body_text or "Please view this email in HTML format.", 'plain')
+    msg.attach(text_part)
+    
+    # Add HTML part
+    html_part = MIMEText(html_body, 'html')
+    msg.attach(html_part)
 
-    email_img_path = os.path.join('static', 'Redemption.jpg')
-    if os.path.exists(email_img_path):
-        try:
-            with open(email_img_path, 'rb') as img:
-                msg.add_attachment(img.read(), maintype='image', subtype='jpeg', filename='Redemption.jpg')
-        except Exception as e:
-            logging.error(f"Attach Redemption.jpg failed: {e}")
+    email_body_path = os.path.join('static', 'EmailBody.jpg')
+    if os.path.exists(email_body_path):
+        with open(email_body_path, 'rb') as f:
+            image_part = MIMEImage(f.read())
+            image_part.add_header('Content-ID', f'<{image_cid}>')
+            image_part.add_header('Content-Disposition', 'inline')
+            # Remove filename to prevent "(noname)" from appearing
+            if 'filename' in image_part:
+                del image_part['filename']
+            msg.attach(image_part)
+
+    redemption_path = os.path.join('static', 'Redemption.jpg')
+    if os.path.exists(redemption_path):
+        with open(redemption_path, 'rb') as f:
+            redemption_part = MIMEImage(f.read())
+            redemption_part.add_header('Content-Disposition', 'attachment', filename='Redemption.jpg')
+            msg.attach(redemption_part)
 
     if attachment_path and os.path.exists(attachment_path):
-        try:
-            with open(attachment_path, 'rb') as f:
-                mime_type, _ = mimetypes.guess_type(attachment_path)
-                maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-                msg.add_attachment(f.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(attachment_path))
-        except Exception as e:
-            logging.error(f"Attach card failed: {e}")
+        with open(attachment_path, 'rb') as f:
+            mime_type, _ = mimetypes.guess_type(attachment_path)
+            if mime_type and mime_type.startswith('image/'):
+                attachment_part = MIMEImage(f.read())
+            else:
+                from email.mime.base import MIMEBase
+                from email import encoders
+                attachment_part = MIMEBase('application', 'octet-stream')
+                attachment_part.set_payload(f.read())
+                encoders.encode_base64(attachment_part)
+            attachment_part.add_header('Content-Disposition', 'attachment', filename=os.path.basename(attachment_path))
+            msg.attach(attachment_part)
 
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
@@ -124,14 +155,14 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         logging.info(f"Email sent to {to_email}")
     except Exception as e:
         logging.error(f"SMTP send failed: {e}")
-
+        
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
     font_policy_no = load_font(FONT_PATH, FONT_SIZE_POLICY_NO)
     font_date = load_font(FONT_PATH, FONT_SIZE_DATE)
     font_name = load_font(FONT_PATH, FONT_SIZE_NAME)
 
-    for i, row in df.iterrows():
+    for _, row in df.iterrows():
         name = str(row.get('Name', 'Unknown'))
         Card = str(row.get('Card', 'Unknown'))
         date = str(row.get('Date', ''))
@@ -148,10 +179,8 @@ def generate_cards_from_df(df, output_folder):
             draw.text(POLICY_NO_POS, format_card_id(Card), font=font_policy_no, fill=WHITE)
             draw.text(VALID_UNTIL_LABEL_POS, "VALID", font=font_label, fill=WHITE)
             bbox = draw.textbbox(VALID_UNTIL_LABEL_POS, "VALID", font=font_label)
-            label_height = bbox[3] - bbox[1]
-            second_line_y = VALID_UNTIL_LABEL_POS[1] + label_height + 5
-            until_date_text = f"UNTIL - {date}"
-            draw.text((VALID_UNTIL_LABEL_POS[0], second_line_y), until_date_text, font=font_date, fill=WHITE)
+            draw.text((VALID_UNTIL_LABEL_POS[0], VALID_UNTIL_LABEL_POS[1] + bbox[3] - bbox[1] + 5),
+                      f"UNTIL - {date}", font=font_date, fill=WHITE)
             draw.text(NAME_POS, name, font=font_name, fill=WHITE)
 
             filename = os.path.join(output_folder, f"{sanitize_filename(name)}_{sanitize_filename(Card)}.png")
@@ -159,7 +188,7 @@ def generate_cards_from_df(df, output_folder):
 
             if email:
                 subject = f"Your A-Member Card Awaits You"
-                send_email_with_attachment(email, subject, filename)
+                send_email_with_attachment(email, subject, "", filename)
 
 def zip_folder(folder_path, zip_path):
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -185,7 +214,7 @@ def clear_folders_periodically():
 if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
     threading.Thread(target=clear_folders_periodically, daemon=True).start()
 
-# Routes
+# ---- Routes ----
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -198,22 +227,43 @@ def index():
             try:
                 shutil.rmtree(OUTPUT_FOLDER, ignore_errors=True)
                 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
                 filepath = os.path.join(UPLOAD_FOLDER, file.filename)
                 file.save(filepath)
-                df = pd.read_excel(filepath, engine='openpyxl') if file.filename.endswith('.xlsx') else pd.read_csv(filepath)
+
+                df = (pd.read_excel(filepath, engine='openpyxl')
+                      if file.filename.endswith('.xlsx') else pd.read_csv(filepath))
+
                 if df.shape[1] < 3:
                     flash('File must have at least 3 columns')
                     return redirect(request.url)
+
                 generate_cards_from_df(df, OUTPUT_FOLDER)
+
                 with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_zip:
                     zip_folder(OUTPUT_FOLDER, tmp_zip.name)
-                return send_file(tmp_zip.name, as_attachment=True, download_name='cards.zip')
+                    zip_path = tmp_zip.name
+
+                # Auto delete the zip after sending
+                @after_this_request
+                def remove_file(response):
+                    try:
+                        os.remove(zip_path)
+                        logging.info(f"🗑️ Deleted {zip_path}")
+                    except Exception as e:
+                        logging.error(f"Error deleting zip: {e}")
+                    return response
+
+                return send_file(zip_path, as_attachment=True, download_name='cards.zip')
+
             except Exception as e:
+                logging.error(traceback.format_exc())   # Full error in terminal/logs
                 flash(f"Processing error: {e}")
                 return redirect(request.url)
-        else:
-            flash('Unsupported file type. Please use the template.')
-            return redirect(request.url)
+
+        flash('Unsupported file type. Please use the template.')
+        return redirect(request.url)
+
     return render_template('index.html')
 
 @app.route('/download_template')
@@ -236,7 +286,12 @@ def api_create_card():
         return {"error": "Card image not generated"}, 500
     return send_file(card_file, as_attachment=True, download_name='card.png')
 
+@app.route('/static/Redemption.jpg')
+def serve_redemption():
+    """Serve Redemption.jpg for email inline images"""
+    return send_file('static/Redemption.jpg', mimetype='image/jpeg')
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5003))
-    logging.info(f"Starting Flask app on port {port}")
+    logging.info(f"🚀 Starting Flask app on port {port}")
     app.run(host='0.0.0.0', port=port, threaded=True)
