@@ -91,10 +91,9 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         3rd Floor (A), No. (108), Corner of<br>
         Kabaraye Pagoda Road and Nat Mauk Road,<br>
         Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>
-    </div>"""
-
-    email_body_path = os.path.join('static', 'EmailBody.jpg')
-    image_cid = "email_body_image"
+    </div>"
+    
+    image_url = "https://raw.githubusercontent.com/Fanse0808/NewMEM/main/EmailBody.jpg"
     
     html_body = f"""
     <html>
@@ -108,21 +107,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg.set_content(body_text or "Please view this email in HTML format.")
     msg.add_alternative(html_body, subtype='html')
 
-    if os.path.exists(email_body_path):
-        with open(email_body_path, 'rb') as f:
-            inline_part = msg.get_payload()[1].add_related(
-                f.read(),
-                maintype='image',
-                subtype='jpeg',
-                cid=f"<{image_cid}>"
-            )
-            inline_part['Content-Disposition'] = 'inline'
-            # Remove any filename that might appear as "(noname)"
-            if 'filename' in inline_part:
-                del inline_part['filename']
-            # Add additional header to make it more invisible
-            inline_part['Content-ID'] = f'<{image_cid}>'
-
+    # Attach Redemption.jpg if exists
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as f:
@@ -133,6 +118,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                 filename='Redemption.jpg'
             )
 
+    # Attach optional attachment
     if attachment_path and os.path.exists(attachment_path):
         with open(attachment_path, 'rb') as f:
             mime_type, _ = mimetypes.guess_type(attachment_path)
@@ -144,6 +130,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                 filename=os.path.basename(attachment_path)
             )
 
+    # Send email
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
