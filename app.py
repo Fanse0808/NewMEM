@@ -50,7 +50,6 @@ if not os.path.exists(SAMPLE_CSV_PATH):
         f.write("Name,Card,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\n"
                 "Jane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com")
 
-# ---- Utility Functions ----
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xlsx', 'csv'}
 
@@ -70,6 +69,7 @@ def format_card_id(card_id):
     numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
     return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
 
+# Move this function above generate_cards_from_df
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
