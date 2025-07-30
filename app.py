@@ -81,7 +81,7 @@ def send_email_clean(to_email, subject, body_text, attachment_path=None):
         return
 
     # Hosted image only (NEVER opened locally)
-    image_url = "https://raw.githubusercontent.com/Fanse0808/NewMEM/main/EmailBody.jpg"
+    image_url = "https://raw.githubusercontent.com/Abraham461/EmailBody/main/EmailBody.jpg"
 
     contact_info = """<div style='text-align:left;'><br>
         Warm Regards,<br>
