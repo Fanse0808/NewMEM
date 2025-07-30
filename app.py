@@ -76,6 +76,12 @@ import logging
 import smtplib
 from email.message import EmailMessage
 
+import os
+import mimetypes
+import logging
+import smtplib
+from email.message import EmailMessage
+
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
     # Fetch environment variables
     smtp_server = os.environ.get('SMTP_SERVER')
