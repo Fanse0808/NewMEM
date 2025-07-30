@@ -70,8 +70,7 @@ def format_card_id(card_id):
     numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
     return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
 
-def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
-    # SMTP credentials
+def send_email_clean(to_email, subject, body_text, attachment_path=None):
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
     smtp_user = os.environ.get('SMTP_USER')
@@ -81,10 +80,9 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         logging.error("Missing SMTP environment variables.")
         return
 
-    # Hosted image URL only (NOT attached)
+    # Hosted image only (NEVER opened locally)
     image_url = "https://raw.githubusercontent.com/Fanse0808/NewMEM/main/EmailBody.jpg"
 
-    # Contact info block
     contact_info = """<div style='text-align:left;'><br>
         Warm Regards,<br>
         Customer Care & Complaints Management<br>
@@ -97,7 +95,6 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>
     </div>"""
 
-    # Strict HTML - external image only
     html_body = f"""
     <html>
         <body>
@@ -112,13 +109,12 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg['Subject'] = subject
     msg['From'] = smtp_user
     msg['To'] = to_email
-
     msg.set_content(body_text or "Please view this email in HTML format.")
-
     msg.add_alternative(html_body, subtype='html')
 
+    # Attach Redemption.jpg only (if exists)
     redemption_path = os.path.join('static', 'Redemption.jpg')
-    if os.path.exists(redemption_path):
+    if os.path.exists(redemption_path) and os.path.basename(redemption_path).lower() != "emailbody.jpg":
         with open(redemption_path, 'rb') as f:
             msg.add_attachment(
                 f.read(),
@@ -127,17 +123,22 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                 filename='Redemption.jpg'
             )
 
+    # Optional attachment (block EmailBody.jpg explicitly)
     if attachment_path and os.path.exists(attachment_path):
-        with open(attachment_path, 'rb') as f:
-            mime_type, _ = mimetypes.guess_type(attachment_path)
-            maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-            msg.add_attachment(
-                f.read(),
-                maintype=maintype,
-                subtype=subtype,
-                filename=os.path.basename(attachment_path)
-            )
+        if os.path.basename(attachment_path).lower() != "emailbody.jpg":
+            with open(attachment_path, 'rb') as f:
+                mime_type, _ = mimetypes.guess_type(attachment_path)
+                maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
+                msg.add_attachment(
+                    f.read(),
+                    maintype=maintype,
+                    subtype=subtype,
+                    filename=os.path.basename(attachment_path)
+                )
+        else:
+            logging.warning("Skipped attaching EmailBody.jpg explicitly.")
 
+    # Send email
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
             server.starttls()
