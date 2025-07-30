@@ -70,10 +70,16 @@ def format_card_id(card_id):
     numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
     return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
 
+import os
+import mimetypes
+import logging
+import smtplib
+from email.message import EmailMessage
+
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
     # Fetch environment variables
     smtp_server = os.environ.get('SMTP_SERVER')
-    smtp_port = os.environ.get('SMTP_PORT', 587)  # Default to 587 if not set
+    smtp_port = int(os.environ.get('SMTP_PORT', 587))  # Default to 587 if not set
     smtp_user = os.environ.get('SMTP_USER')
     smtp_password = os.environ.get('SMTP_PASSWORD')
 
@@ -82,13 +88,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         logging.error("One or more SMTP environment variables are not set.")
         return
 
-    # Convert port to integer
-    try:
-        smtp_port = int(smtp_port)
-    except ValueError:
-        logging.error("SMTP_PORT must be an integer.")
-        return
-
+    # Create EmailMessage object
     msg = EmailMessage()
     msg['Subject'] = subject
     msg['From'] = smtp_user
@@ -105,13 +105,14 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         Kabaraye Pagoda Road and Nat Mauk Road,<br>
         Bo Cho (1) Quarter, Bahan Township, Yangon, Myanmar 12201<br>
     </div>"""
-
-    image_cid = "email_body_image"
+    
+    # Use the provided link for the inline image
+    image_url = "https://raw.githubusercontent.com/Fanse0808/NewMEM/main/EmailBody.jpg"
     
     html_body = f"""
     <html>
         <body>
-            <img src="cid:{image_cid}" style="max-width:100%;" alt="Email Body Image"><br>
+            <img src="{image_url}" style="max-width:100%;" alt="Email Body Image"><br>
             <p>{body_text}</p>
             {contact_info}
         </body>
@@ -121,20 +122,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg.set_content(body_text or "Please view this email in HTML format.")
     msg.add_alternative(html_body, subtype='html')
 
-    # Attach EmailBody.jpg inline (invisible in preview)
-    email_body_image_path = os.path.join('static', 'EmailBody.jpg')
-    if os.path.exists(email_body_image_path):
-        with open(email_body_image_path, 'rb') as f:
-            msg.add_attachment(
-                f.read(),
-                maintype='image',
-                subtype='jpeg',
-                filename='EmailBody.jpg',
-                cid=image_cid
-            )
-    else:
-        logging.error(f"Image file {email_body_image_path} does not exist.")
-
+    # Attach Redemption.jpg as a visible attachment
     redemption_path = os.path.join('static', 'Redemption.jpg')
     if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as f:
@@ -147,6 +135,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     else:
         logging.error(f"Redemption file {redemption_path} does not exist.")
 
+    # Attach optional attachment
     if attachment_path and os.path.exists(attachment_path):
         with open(attachment_path, 'rb') as f:
             mime_type, _ = mimetypes.guess_type(attachment_path)
@@ -155,7 +144,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
                 f.read(),
                 maintype=maintype,
                 subtype=subtype,
-                filename=os.path.basename(attachment_path)
+                filename=os.path.basename(attachment_path)  # This will show up as an attachment
             )
 
     # Send email
@@ -168,7 +157,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         logging.info(f"Email sent to {to_email}")
     except Exception as e:
         logging.error(f"SMTP send failed: {e}")
-        
+
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
     font_policy_no = load_font(FONT_PATH, FONT_SIZE_POLICY_NO)
