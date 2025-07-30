@@ -11,7 +11,6 @@ import mimetypes
 import traceback
 import base64
 from email.message import EmailMessage
-
 from flask import Flask, render_template, request, redirect, flash, send_file, after_this_request
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
@@ -50,6 +49,7 @@ if not os.path.exists(SAMPLE_CSV_PATH):
         f.write("Name,Card,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\n"
                 "Jane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com")
 
+# ---- Utility Functions ----
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xlsx', 'csv'}
 
@@ -69,7 +69,6 @@ def format_card_id(card_id):
     numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
     return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
 
-# Move this function above generate_cards_from_df
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
@@ -182,106 +181,9 @@ def generate_cards_from_df(df, output_folder):
                 subject = f"Your A-Member Card Awaits You"
                 send_email_with_attachment(email, subject, "", filename)
 
-def zip_folder(folder_path, zip_path):
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for root, _, files in os.walk(folder_path):
-            for file in files:
-                if file.lower().endswith('.png'):
-                    zipf.write(os.path.join(root, file), arcname=file)
+# ---- Other Functions and Flask Routes ----
 
-def clear_folders_periodically():
-    while True:
-        for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER]:
-            for filename in os.listdir(folder):
-                file_path = os.path.join(folder, filename)
-                try:
-                    if os.path.isfile(file_path):
-                        os.unlink(file_path)
-                    elif os.path.isdir(file_path):
-                        shutil.rmtree(file_path)
-                except Exception as e:
-                    logging.error(f"Cleanup error: {e}")
-        time.sleep(43200)  # every 12 hours
-
-if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
-    threading.Thread(target=clear_folders_periodically, daemon=True).start()
-
-# ---- Routes ----
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        file = request.files.get('file')
-        if not file or not file.filename:
-            flash('No file uploaded')
-            return redirect(request.url)
-
-        if allowed_file(file.filename):
-            try:
-                shutil.rmtree(OUTPUT_FOLDER, ignore_errors=True)
-                os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-
-                filepath = os.path.join(UPLOAD_FOLDER, file.filename)
-                file.save(filepath)
-
-                df = (pd.read_excel(filepath, engine='openpyxl')
-                      if file.filename.endswith('.xlsx') else pd.read_csv(filepath))
-
-                if df.shape[1] < 3:
-                    flash('File must have at least 3 columns')
-                    return redirect(request.url)
-
-                generate_cards_from_df(df, OUTPUT_FOLDER)
-
-                with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_zip:
-                    zip_folder(OUTPUT_FOLDER, tmp_zip.name)
-                    zip_path = tmp_zip.name
-
-                # Auto delete the zip after sending
-                @after_this_request
-                def remove_file(response):
-                    try:
-                        os.remove(zip_path)
-                        logging.info(f"🗑️ Deleted {zip_path}")
-                    except Exception as e:
-                        logging.error(f"Error deleting zip: {e}")
-                    return response
-
-                return send_file(zip_path, as_attachment=True, download_name='cards.zip')
-
-            except Exception as e:
-                logging.error(traceback.format_exc())   # Full error in terminal/logs
-                flash(f"Processing error: {e}")
-                return redirect(request.url)
-
-        flash('Unsupported file type. Please use the template.')
-        return redirect(request.url)
-
-    return render_template('index.html')
-
-@app.route('/download_template')
-def download_template():
-    return send_file(SAMPLE_CSV_PATH, as_attachment=True, download_name='sample_cards.csv')
-
-@app.route('/api/create_card', methods=['POST'])
-def api_create_card():
-    data = request.get_json()
-    if not data:
-        return {"error": "No JSON payload provided"}, 400
-    if not all(key in data for key in ('Name', 'Card', 'Date')):
-        return {"error": "Missing fields: Name, Card, Date"}, 400
-
-    df = pd.DataFrame([[data['Name'], data['Card'], data['Date']]], columns=['Name', 'Card', 'Date'])
-    output_folder = tempfile.mkdtemp()
-    generate_cards_from_df(df, output_folder)
-    card_file = next((os.path.join(output_folder, f) for f in os.listdir(output_folder) if f.endswith('.png')), None)
-    if not card_file:
-        return {"error": "Card image not generated"}, 500
-    return send_file(card_file, as_attachment=True, download_name='card.png')
-
-@app.route('/static/Redemption.jpg')
-def serve_redemption():
-    """Serve Redemption.jpg for email inline images"""
-    return send_file('static/Redemption.jpg', mimetype='image/jpeg')
+# Ensure the rest of your Flask routes and other functions are defined here
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5003))
