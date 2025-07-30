@@ -180,7 +180,7 @@ def generate_cards_from_df(df, output_folder):
 
             if email:
                 subject = f"Your A-Member Card Awaits You"
-                send_email_with_attachment(email, subject, "", filename)
+                send_email_clean(email, subject, "", filename)
 
 def zip_folder(folder_path, zip_path):
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
