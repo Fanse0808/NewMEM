@@ -104,48 +104,46 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     </html>
     """
 
-    msg = EmailMessage()
-    msg['Subject'] = subject
-    msg['From'] = smtp_user
-    msg['To'] = to_email
-    msg.set_content(body_text or "Please view this email in HTML format.")
-    msg.add_alternative(html_body, subtype='html')
+msg = EmailMessage()
+msg['Subject'] = subject
+msg['From'] = smtp_user
+msg['To'] = to_email
+msg.set_content(body_text or "Please view this email in HTML format.")
+msg.add_alternative(html_body, subtype='html')
 
-    # Attach Redemption.jpg only (if exists)
-    redemption_path = os.path.join('static', 'Redemption.jpg')
-    if os.path.exists(redemption_path) and os.path.basename(redemption_path).lower() != "emailbody.jpg":
-        with open(redemption_path, 'rb') as f:
+redemption_path = os.path.join('static', 'Redemption.jpg')
+if os.path.exists(redemption_path) and os.path.basename(redemption_path).lower() != "emailbody.jpg":
+    with open(redemption_path, 'rb') as f:
+        msg.add_attachment(
+            f.read(),
+            maintype='image',
+            subtype='jpeg',
+            filename='Redemption.jpg'
+        )
+
+if attachment_path and os.path.exists(attachment_path):
+    if os.path.basename(attachment_path).lower() != "emailbody.jpg":
+        with open(attachment_path, 'rb') as f:
+            mime_type, _ = mimetypes.guess_type(attachment_path)
+            maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
             msg.add_attachment(
                 f.read(),
-                maintype='image',
-                subtype='jpeg',
-                filename='Redemption.jpg'
+                maintype=maintype,
+                subtype=subtype,
+                filename=os.path.basename(attachment_path)
             )
+    else:
+        logging.warning("Skipped attaching EmailBody.jpg explicitly.")
 
-    # Optional attachment (block EmailBody.jpg explicitly)
-    if attachment_path and os.path.exists(attachment_path):
-        if os.path.basename(attachment_path).lower() != "emailbody.jpg":
-            with open(attachment_path, 'rb') as f:
-                mime_type, _ = mimetypes.guess_type(attachment_path)
-                maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-                msg.add_attachment(
-                    f.read(),
-                    maintype=maintype,
-                    subtype=subtype,
-                    filename=os.path.basename(attachment_path)
-                )
-        else:
-            logging.warning("Skipped attaching EmailBody.jpg explicitly.")
-
-    # Send email
-    try:
-        with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.send_message(msg)
-        logging.info(f"Email sent to {to_email}")
-    except Exception as e:
-        logging.error(f"SMTP send failed: {e}")
+# Send email
+try:
+    with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+    logging.info(f"Email sent to {to_email}")
+except Exception as e:
+    logging.error(f"SMTP send failed: {e}")
 
 def generate_cards_from_df(df, output_folder):
     font_label = load_font(FONT_PATH, FONT_SIZE_LABEL)
