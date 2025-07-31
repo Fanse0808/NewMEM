@@ -59,10 +59,19 @@ def sanitize_filename(name):
 
 def format_card_id(card_id):
     cleaned = re.sub(r'[^a-zA-Z0-9]', '', str(card_id))
-    chars = cleaned[:3].ljust(3, 'X')
-    numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
-    return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
-
+    
+    if cleaned.startswith("AL001") or cleaned.startswith("STE"):
+        # New style: AL001/STE-0000000/0000
+        prefix = "AL001"
+        category = "STE"
+        numbers = ''.join(c for c in cleaned if c.isdigit()).ljust(7, '0')[:7]
+        suffix = ''.join(c for c in cleaned if c.isdigit()).ljust(4, '0')[:4]
+        return f"{prefix}/{category}-{numbers}/{suffix}"
+    
+    else:
+        chars = cleaned[:3].ljust(3, 'X')
+        numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
+        return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
