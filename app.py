@@ -79,7 +79,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
         Warm Regards,<br>
         Customer Care & Complaints Management<br>
         Operation Department<br><br>
-        Phone: +95 9791232222<br>
+        Phone: +95 9791233333<br>
         Email: customercare@alife.com.mm<br><br>
         A Life Insurance Company Limited<br>
         3rd Floor (A), No. (108), Corner of<br>
