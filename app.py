@@ -87,7 +87,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     smtp_user = os.environ.get('SMTP_USER')
     smtp_password = os.environ.get('SMTP_PASSWORD')
 
-    image_url = "https://raw.githubusercontent.com/Abraham461/EmailBody/main/EmailBody.jpg"
+    image_url = "https://i.imghippo.com/files/shL3300Ww.jpg"
 
     contact_info = """<div style='text-align:left;'><br>
         Warm Regards,<br>
