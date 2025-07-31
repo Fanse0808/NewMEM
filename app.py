@@ -69,10 +69,6 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     smtp_user = os.environ.get('SMTP_USER')
     smtp_password = os.environ.get('SMTP_PASSWORD')
 
-    if not all([smtp_server, smtp_user, smtp_password]):
-        logging.error("Missing SMTP environment variables.")
-        return
-
     image_url = "https://raw.githubusercontent.com/Abraham461/EmailBody/main/EmailBody.jpg"
 
     contact_info = """<div style='text-align:left;'><br>
