@@ -58,16 +58,23 @@ def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|\n]', '', name)[:100]
 
 def format_card_id(card_id):
-    cleaned = re.sub(r'[^a-zA-Z0-9]', '', str(card_id))
+    cleaned = ''.join(c for c in str(card_id) if c.isalnum())
     
     if cleaned.startswith("AL001") or cleaned.startswith("STE"):
-        # New style: AL001/STE-0000000/0000
         prefix = "AL001"
-        category = "STE"
-        numbers = ''.join(c for c in cleaned if c.isdigit()).ljust(7, '0')[:7]
-        suffix = ''.join(c for c in cleaned if c.isdigit()).ljust(4, '0')[:4]
+        
+        if cleaned.startswith("AL001"):
+            category = cleaned[5:8] if len(cleaned) >= 8 else "XXX"
+        else:
+            category = cleaned[:3]
+
+        digits = ''.join(c for c in cleaned if c.isdigit())
+
+        numbers = digits[:7].ljust(7, '0')
+        suffix = digits[7:11].ljust(4, '0')
+
         return f"{prefix}/{category}-{numbers}/{suffix}"
-    
+
     else:
         chars = cleaned[:3].ljust(3, 'X')
         numbers = ''.join(c for c in cleaned if c.isdigit())[:11].ljust(11, '0')
