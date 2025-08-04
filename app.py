@@ -9,7 +9,6 @@ import logging
 import smtplib
 import mimetypes
 import traceback
-import base64
 from email.message import EmailMessage
 from flask import Flask, render_template, request, redirect, flash, send_file, after_this_request
 import pandas as pd
@@ -41,8 +40,11 @@ for folder in (UPLOAD_FOLDER, OUTPUT_FOLDER, 'static'):
 
 if not os.path.exists(SAMPLE_CSV_PATH):
     with open(SAMPLE_CSV_PATH, 'w') as f:
-        f.write("Name,Card,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\n"
-                "Jane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com")
+        f.write(
+            "Name,Card,Date,VIP,Email\n"
+            "John Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\n"
+            "Jane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com"
+        )
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xlsx', 'csv'}
@@ -62,7 +64,6 @@ def format_card_id(card_id):
     
     if cleaned.startswith("AL001") or cleaned.startswith("STE"):
         prefix = "AL001"
-        
         if cleaned.startswith("AL001"):
             category = cleaned[5:8] if len(cleaned) >= 8 else "XXX"
             digits = ''.join(c for c in cleaned[8:] if c.isdigit())
@@ -111,7 +112,6 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     </html>
     """
 
-    # Clean up the email
     cleaned_email = to_email.strip().replace('\r', '').replace('\n', '')
 
     msg = EmailMessage()
@@ -122,7 +122,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     msg.add_alternative(html_body, subtype='html')
 
     redemption_path = os.path.join('static', 'Redemption.jpg')
-    if os.path.exists(redemption_path) and os.path.basename(redemption_path).lower() != "emailbody.jpg":
+    if os.path.exists(redemption_path):
         with open(redemption_path, 'rb') as f:
             msg.add_attachment(
                 f.read(),
@@ -132,21 +132,19 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             )
 
     if attachment_path and os.path.exists(attachment_path):
-        if os.path.basename(attachment_path).lower() != "emailbody.jpg":
-            with open(attachment_path, 'rb') as f:
-                mime_type, _ = mimetypes.guess_type(attachment_path)
-                maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
-                msg.add_attachment(
-                    f.read(),
-                    maintype=maintype,
-                    subtype=subtype,
-                    filename=os.path.basename(attachment_path)
-                )
-        else:
-            logging.warning("Skipped attaching EmailBody.jpg explicitly.")
+        with open(attachment_path, 'rb') as f:
+            mime_type, _ = mimetypes.guess_type(attachment_path)
+            maintype, subtype = mime_type.split('/') if mime_type else ('application', 'octet-stream')
+            msg.add_attachment(
+                f.read(),
+                maintype=maintype,
+                subtype=subtype,
+                filename=os.path.basename(attachment_path)
+            )
 
     try:
         with smtplib.SMTP(smtp_server, smtp_port, timeout=10) as server:
+            server.set_debuglevel(1)  # Enable SMTP debug output in logs
             server.starttls()
             server.login(smtp_user, smtp_password)
             server.send_message(msg)
@@ -177,15 +175,17 @@ def generate_cards_from_df(df, output_folder):
             draw.text(POLICY_NO_POS, format_card_id(Card), font=font_policy_no, fill=WHITE)
             draw.text(VALID_UNTIL_LABEL_POS, "VALID", font=font_label, fill=WHITE)
             bbox = draw.textbbox(VALID_UNTIL_LABEL_POS, "VALID", font=font_label)
-            draw.text((VALID_UNTIL_LABEL_POS[0], VALID_UNTIL_LABEL_POS[1] + bbox[3] - bbox[1] + 5),
-                      f"UNTIL - {date}", font=font_date, fill=WHITE)
+            draw.text(
+                (VALID_UNTIL_LABEL_POS[0], VALID_UNTIL_LABEL_POS[1] + bbox[3] - bbox[1] + 5),
+                f"UNTIL - {date}", font=font_date, fill=WHITE
+            )
             draw.text(NAME_POS, name, font=font_name, fill=WHITE)
 
             filename = os.path.join(output_folder, f"{sanitize_filename(name)}_{sanitize_filename(Card)}.png")
             card.save(filename, format='PNG')
 
             if email:
-                subject = f"Your A-Member Card Awaits You"
+                subject = "Your A-Member Card Awaits You"
                 send_email_with_attachment(email, subject, "", filename)
 
 def zip_folder(folder_path, zip_path):
@@ -207,7 +207,7 @@ def clear_folders_periodically():
                         shutil.rmtree(file_path)
                 except Exception as e:
                     logging.error(f"Cleanup error: {e}")
-        time.sleep(43200)
+        time.sleep(43200)  # 12 hours
 
 if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
     threading.Thread(target=clear_folders_periodically, daemon=True).start()
@@ -228,8 +228,11 @@ def index():
                 filepath = os.path.join(UPLOAD_FOLDER, file.filename)
                 file.save(filepath)
 
-                df = (pd.read_excel(filepath, engine='openpyxl')
-                      if file.filename.endswith('.xlsx') else pd.read_csv(filepath))
+                df = (
+                    pd.read_excel(filepath, engine='openpyxl')
+                    if file.filename.endswith('.xlsx')
+                    else pd.read_csv(filepath)
+                )
 
                 if df.shape[1] < 3:
                     flash('File must have at least 3 columns')
