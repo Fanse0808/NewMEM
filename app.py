@@ -80,7 +80,7 @@ def format_card_id(card_id):
         digits = ''.join(c for c in cleaned if c.isdigit())
         numbers = digits[:11].ljust(11, '0')
         return f"{chars}-{numbers[:4]} {numbers[4:8]} {numbers[8:11]}"
-        
+
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
     smtp_server = os.environ.get('SMTP_SERVER')
     smtp_port = int(os.environ.get('SMTP_PORT', 587))
@@ -111,10 +111,13 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
     </html>
     """
 
+    # Clean up the email
+    cleaned_email = to_email.strip().replace('\r', '').replace('\n', '')
+
     msg = EmailMessage()
     msg['Subject'] = subject
     msg['From'] = smtp_user
-    msg['To'] = to_email
+    msg['To'] = cleaned_email
     msg.set_content(body_text or "Please view this email in HTML format.")
     msg.add_alternative(html_body, subtype='html')
 
@@ -147,7 +150,7 @@ def send_email_with_attachment(to_email, subject, body_text, attachment_path=Non
             server.starttls()
             server.login(smtp_user, smtp_password)
             server.send_message(msg)
-        logging.info(f"Email sent to {to_email}")
+        logging.info(f"Email sent to {cleaned_email}")
     except Exception as e:
         logging.error(f"SMTP send failed: {e}")
 
