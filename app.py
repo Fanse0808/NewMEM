@@ -11,8 +11,8 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'supersecretkey')
 
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'output'
-FONT_PATH = 'static/Montserrat-Bold.ttf'  # ✅ adjusted for your folder
-TEMPLATE_PATH = 'static/sample_cards.csv'  # updated template file path
+FONT_PATH = 'static/Montserrat-Bold.ttf'  # Your font file path
+TEMPLATE_PATH = 'static/sample_cards.csv'  # Your template file path
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -42,7 +42,6 @@ def upload():
     file.save(filepath)
 
     try:
-        # faster Excel/CSV parsing
         if filepath.endswith('.csv'):
             df = pd.read_csv(filepath, dtype=str)
         elif filepath.endswith(('.xls', '.xlsx')):
@@ -55,14 +54,13 @@ def upload():
             flash('Uploaded file is empty.')
             return redirect('/')
 
-        # safer clean-up
+        # Clean output folder
         if os.path.exists(OUTPUT_FOLDER):
             for f in os.listdir(OUTPUT_FOLDER):
                 os.remove(os.path.join(OUTPUT_FOLDER, f))
 
         generate_cards_from_df(df, OUTPUT_FOLDER)
 
-        # Create ZIP in temp dir
         zip_path = os.path.join(tempfile.gettempdir(), 'cards.zip')
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for filename in os.listdir(OUTPUT_FOLDER):
@@ -103,4 +101,6 @@ def generate_cards_from_df(df, output_folder):
         img.save(os.path.join(output_folder, filename))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
