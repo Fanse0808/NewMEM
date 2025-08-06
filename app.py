@@ -170,7 +170,7 @@ def generate_cards_from_df(df, output_folder):
 
     for _, row in df.iterrows():
         name = str(row.get('Name', 'Unknown'))
-        Card = str(row.get('Card', 'Unknown'))
+        Card = str(row.get('Card', 'Unknown')).strip()
         date = str(row.get('Date', ''))
         vip_status = str(row.get('VIP', 'no')).strip().lower()
         email = str(row.get('Email')) if pd.notna(row.get('Email')) else None
@@ -182,7 +182,14 @@ def generate_cards_from_df(df, output_folder):
         with Image.open(template_img) as im:
             card = im.convert('RGB')
             draw = ImageDraw.Draw(card)
-            draw.text(POLICY_NO_POS, format_card_id(Card), font=font_policy_no, fill=WHITE)
+
+            # Only format if card starts with AL001, else print as user entered
+            if Card.startswith("AL001"):
+                display_text = format_card_id(Card)
+            else:
+                display_text = Card
+
+            draw.text(POLICY_NO_POS, display_text, font=font_policy_no, fill=WHITE)
             draw.text(VALID_UNTIL_LABEL_POS, "VALID", font=font_label, fill=WHITE)
             bbox = draw.textbbox(VALID_UNTIL_LABEL_POS, "VALID", font=font_label)
             draw.text(
