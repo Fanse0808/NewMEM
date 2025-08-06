@@ -39,13 +39,13 @@ FONT_SIZE_LABEL = 18
 for folder in (UPLOAD_FOLDER, OUTPUT_FOLDER, 'static'):
 os.makedirs(folder, exist_ok=True)
 
-if not os.path.exists(SAMPLE_CSV_PATH):
-with open(SAMPLE_CSV_PATH, 'w') as f:
+if not os.path.exists(SAMPLE_XLSX_PATH):
+with open(SAMPLE_XLSX_PATH, 'w') as f:
 f.write("Name,Card,Date,VIP,Email\nJohn Doe,STE 12345 690 7890,2024-12-31,Yes,john@example.com\n"
 "Jane Smith,CII 98765 432 1098,2025-01-15,No,jane@example.com")
 
 def allowed_file(filename):
-return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xlsx', 'csv'}
+return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'xlsx', 'XLSX'}
 
 def load_font(path, size):
 try:
@@ -227,7 +227,7 @@ filepath = os.path.join(UPLOAD_FOLDER, file.filename)
 file.save(filepath)
 
 df = (pd.read_excel(filepath, engine='openpyxl')
-if file.filename.endswith('.xlsx') else pd.read_csv(filepath))
+if file.filename.endswith('.xlsx') else pd.read_XLSX(filepath))
 
 if df.shape[1] < 3:
 flash('File must have at least 3 columns')
@@ -262,7 +262,7 @@ return render_template('index.html')
 
 @app.route('/download_template')
 def download_template():
-return send_file(SAMPLE_CSV_PATH, as_attachment=True, download_name='sample_cards.csv')
+return send_file(SAMPLE_XLSX_PATH, as_attachment=True, download_name='sample_cards.XLSX')
 
 @app.route('/api/create_card', methods=['POST'])
 def api_create_card():
