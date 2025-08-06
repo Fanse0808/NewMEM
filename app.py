@@ -183,11 +183,16 @@ def generate_cards_from_df(df, output_folder):
             card = im.convert('RGB')
             draw = ImageDraw.Draw(card)
 
-            # Only format if card starts with AL001, else print as user entered
+            # Updated card display logic:
             if Card.startswith("AL001"):
                 display_text = format_card_id(Card)
             else:
-                display_text = Card
+                # Check if Card starts with 3 letters + digits (e.g. STE25070000291, HEA123456789)
+                m = re.match(r'^([A-Za-z]{3})(\d+)$', Card)
+                if m:
+                    display_text = f"{m.group(1)} {m.group(2)}"  # insert space after prefix
+                else:
+                    display_text = Card  # print as-is
 
             draw.text(POLICY_NO_POS, display_text, font=font_policy_no, fill=WHITE)
             draw.text(VALID_UNTIL_LABEL_POS, "VALID", font=font_label, fill=WHITE)
