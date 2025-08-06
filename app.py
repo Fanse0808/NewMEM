@@ -11,10 +11,16 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'supersecretkey')
 
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'output'
-FONT_PATH = 'static/fonts/Montserrat-Bold.ttf'
+FONT_PATH = 'static/Montserrat-Bold.ttf'  # ✅ adjusted for your folder
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+# 🔁 Cache font once
+try:
+    default_font = ImageFont.truetype(FONT_PATH, 40)
+except:
+    default_font = ImageFont.load_default()
 
 @app.route('/')
 def index():
@@ -35,10 +41,11 @@ def upload():
     file.save(filepath)
 
     try:
+        # 🔽 faster Excel/CSV parsing
         if filepath.endswith('.csv'):
-            df = pd.read_csv(filepath)
+            df = pd.read_csv(filepath, dtype=str)
         elif filepath.endswith(('.xls', '.xlsx')):
-            df = pd.read_excel(filepath, engine='openpyxl')
+            df = pd.read_excel(filepath, engine='openpyxl', dtype=str)
         else:
             flash('Unsupported file type.')
             return redirect('/')
@@ -47,18 +54,19 @@ def upload():
             flash('Uploaded file is empty.')
             return redirect('/')
 
-        print("Headers detected:", df.columns.tolist())
-        shutil.rmtree(OUTPUT_FOLDER)
-        os.makedirs(OUTPUT_FOLDER)
+        # 💡 safer clean-up
+        if os.path.exists(OUTPUT_FOLDER):
+            for f in os.listdir(OUTPUT_FOLDER):
+                os.remove(os.path.join(OUTPUT_FOLDER, f))
+
         generate_cards_from_df(df, OUTPUT_FOLDER)
 
-        # Create ZIP
+        # 🔧 Create ZIP in memory-friendly temp dir
         zip_path = os.path.join(tempfile.gettempdir(), 'cards.zip')
-        with zipfile.ZipFile(zip_path, 'w') as zipf:
-            for root, _, files in os.walk(OUTPUT_FOLDER):
-                for filename in files:
-                    file_path = os.path.join(root, filename)
-                    zipf.write(file_path, arcname=filename)
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for filename in os.listdir(OUTPUT_FOLDER):
+                file_path = os.path.join(OUTPUT_FOLDER, filename)
+                zipf.write(file_path, arcname=filename)
 
         return send_file(zip_path, as_attachment=True)
 
@@ -69,25 +77,24 @@ def upload():
 def generate_cards_from_df(df, output_folder):
     for i, row in df.iterrows():
         img = Image.new('RGB', (1000, 600), color='white')
-        d = ImageDraw.Draw(img)
-        try:
-            font = ImageFont.truetype(FONT_PATH, 40)
-        except:
-            font = ImageFont.load_default()
+        draw = ImageDraw.Draw(img)
 
-        # Extract fields safely
+        # 🧠 Use cached font
+        font = default_font
+
+        # ✏️ Extract fields with defaults
         name = str(row.get('Name', '')).strip()
         email = str(row.get('Email', '')).strip()
         title = str(row.get('Title', row.get('Department', ''))).strip()
         card_number = str(row.get('Card Number', row.get('ID', f"Card{i+1}"))).strip()
 
-        # Draw text on the card
-        d.text((50, 80), f"Card #: {card_number}", fill='black', font=font)
-        d.text((50, 160), f"Name: {name}", fill='black', font=font)
-        d.text((50, 240), f"Email: {email}", fill='black', font=font)
-        d.text((50, 320), f"Title: {title}", fill='black', font=font)
+        # 🖼️ Draw text
+        draw.text((50, 80), f"Card #: {card_number}", fill='black', font=font)
+        draw.text((50, 160), f"Name: {name}", fill='black', font=font)
+        draw.text((50, 240), f"Email: {email}", fill='black', font=font)
+        draw.text((50, 320), f"Title: {title}", fill='black', font=font)
 
-        # Save image
+        # 💾 Save image
         filename = f"{card_number.replace('/', '_')}.png"
         img.save(os.path.join(output_folder, filename))
 
