@@ -36,8 +36,11 @@ FONT_SIZE_DATE = 22
 FONT_SIZE_NAME = 25
 FONT_SIZE_LABEL = 18
 
-for folder in (UPLOAD_FOLDER, OUTPUT_FOLDER, 'static'):
-os.makedirs(folder, exist_ok=True)
+
+
+
+for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER]:
+    os.makedirs(folder, exist_ok=True)
 
 if not os.path.exists(SAMPLE_XLSX_PATH):
 with open(SAMPLE_XLSX_PATH, 'w') as f:
