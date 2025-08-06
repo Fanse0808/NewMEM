@@ -12,7 +12,7 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'supersecretkey')
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'output'
 FONT_PATH = 'static/Montserrat-Bold.ttf'  # ✅ adjusted for your folder
-TEMPLATE_PATH = 'static/template.xlsx'    # path to your download template file
+TEMPLATE_PATH = 'static/sample_cards.csv'  # updated template file path
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
