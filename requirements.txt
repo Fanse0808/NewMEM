@@ -1,12 +1,4 @@
-Flask==2.3.3
-pandas==2.2.2
-openpyxl==3.1.2
-Pillow==10.2.0
-
-# force prebuilt wheels if available
---prefer-binary
-
-# speed up build system
-pip>=25.2
-setuptools>=70
-wheel>=0.43
+Flask>=2.3
+pandas>=2.2.2
+openpyxl>=3.1.2
+Pillow>=10.3
