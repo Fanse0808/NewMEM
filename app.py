@@ -225,8 +225,13 @@ def index():
                 filepath = os.path.join(UPLOAD_FOLDER, file.filename)
                 file.save(filepath)
 
-                df = (pd.read_excel(filepath, engine='openpyxl')
-                      if file.filename.endswith('.xlsx') else pd.read_csv(filepath))
+                if file.filename.endswith('.xlsx'):
+                    df = pd.read_excel(filepath, engine='openpyxl')
+                else:
+                    try:
+                        df = pd.read_csv(filepath, encoding='utf-8')
+                    except UnicodeDecodeError:
+                        df = pd.read_csv(filepath, encoding='latin1')
 
                 if df.shape[1] < 3:
                     flash('File must have at least 3 columns')
