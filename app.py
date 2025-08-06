@@ -43,7 +43,21 @@ def upload():
 
     try:
         if filepath.endswith('.csv'):
-            df = pd.read_csv(filepath, dtype=str)
+            # Read raw bytes
+            with open(filepath, 'rb') as f:
+                content = f.read()
+            # Replace UTF-8 non-breaking spaces with normal spaces
+            content = content.replace(b'\xc2\xa0', b' ')
+            # Write cleaned bytes back
+            with open(filepath, 'wb') as f:
+                f.write(content)
+            
+            # Try reading CSV with utf-8, fallback to latin1
+            try:
+                df = pd.read_csv(filepath, dtype=str, encoding='utf-8')
+            except UnicodeDecodeError:
+                df = pd.read_csv(filepath, dtype=str, encoding='latin1')
+
         elif filepath.endswith(('.xls', '.xlsx')):
             df = pd.read_excel(filepath, engine='openpyxl', dtype=str)
         else:
@@ -101,6 +115,5 @@ def generate_cards_from_df(df, output_folder):
         img.save(os.path.join(output_folder, filename))
 
 if __name__ == '__main__':
-    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
