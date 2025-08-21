@@ -174,7 +174,6 @@ def generate_cards_from_df(df, output_folder):
         date_val = row.get('Date', '')
         if pd.notna(date_val):
             try:
-                # If it's a datetime, format as YYYY-MM-DD
                 date = pd.to_datetime(date_val).strftime("%Y-%m-%d")
             except Exception:
                 date = str(date_val)
@@ -195,19 +194,19 @@ def generate_cards_from_df(df, output_folder):
             if Card.startswith("AL001"):
                 display_text = format_card_id(Card)
             else:
-                # Check if Card starts with 3 letters + digits (e.g. STE25070000291, HEA123456789)
                 m = re.match(r'^([A-Za-z]{3})(\d+)$', Card)
                 if m:
-                    display_text = f"{m.group(1)} {m.group(2)}"  # insert space after prefix
+                    display_text = f"{m.group(1)} {m.group(2)}"
                 else:
-                    display_text = Card  # print as-is
+                    display_text = Card
 
             draw.text(POLICY_NO_POS, display_text, font=font_policy_no, fill=WHITE)
             draw.text(VALID_UNTIL_LABEL_POS, "VALID", font=font_label, fill=WHITE)
             bbox = draw.textbbox(VALID_UNTIL_LABEL_POS, "VALID", font=font_label)
             draw.text(
                 (VALID_UNTIL_LABEL_POS[0], VALID_UNTIL_LABEL_POS[1] + bbox[3] - bbox[1] + 5),
-                f"UNTIL - {date}", font=font_date, fill=WHITE)
+                f"UNTIL - {date}", font=font_date, fill=WHITE
+            )
             draw.text(NAME_POS, name, font=font_name, fill=WHITE)
 
             filename = os.path.join(output_folder, f"{sanitize_filename(name)}_{sanitize_filename(Card)}.png")
@@ -261,7 +260,6 @@ def index():
                 filepath = os.path.join(UPLOAD_FOLDER, file.filename)
                 file.save(filepath)
 
-                # Read Excel file only
                 df = pd.read_excel(filepath, engine='openpyxl')
 
                 if df.shape[1] < 3:
