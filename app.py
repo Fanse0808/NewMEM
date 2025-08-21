@@ -171,7 +171,15 @@ def generate_cards_from_df(df, output_folder):
     for _, row in df.iterrows():
         name = str(row.get('Name', 'Unknown'))
         Card = str(row.get('Card', 'Unknown')).strip()
-        date = str(row.get('Date', ''))
+        date_val = row.get('Date', '')
+        if pd.notna(date_val):
+    try:
+        # If it's a datetime, format as YYYY-MM-DD
+        date = pd.to_datetime(date_val).strftime("%Y-%m-%d")
+        except Exception:
+        date = str(date_val)
+        else:
+        date = ""
         vip_status = str(row.get('VIP', 'no')).strip().lower()
         email = str(row.get('Email')) if pd.notna(row.get('Email')) else None
 
