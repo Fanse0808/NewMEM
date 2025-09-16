@@ -92,10 +92,10 @@ def format_card_id(card_id):
 
 
 def send_email_with_attachment(to_email, subject, body_text, attachment_path=None):
-    smtp_server = smtp.office365.com
-    smtp_port = 587
-    smtp_user = auto.reply@alife.com.mm
-    smtp_password = Al2025Ygn
+    smtp_server = os.environ.get('SMTP_SERVER')
+    smtp_port = int(os.environ.get('SMTP_PORT', 587))
+    smtp_user = os.environ.get('SMTP_USER')
+    smtp_password = os.environ.get('SMTP_PASSWORD')
 
     image_url = "https://i.imghippo.com/files/shL3300Ww.jpg"
 
